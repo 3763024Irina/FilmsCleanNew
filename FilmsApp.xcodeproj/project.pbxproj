@@ -19,6 +19,7 @@
 		61D0A58526B2A90D00FD68FF /* FavoriteFilmsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61D0A58426B2A90D00FD68FF /* FavoriteFilmsViewController.swift */; };
 		61EDC4AF26B406020016854F /* JSONModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61EDC4AE26B406020016854F /* JSONModel.swift */; };
 		8C6A4A092DAAB51300739AB1 /* MyCustomCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C6A4A082DAAB51300739AB1 /* MyCustomCell.swift */; };
+		8C6A4A0D2DAEC3ED00739AB1 /* MyCustomCell.xib in Resources */ = {isa = PBXBuildFile; fileRef = 8C6A4A0C2DAEC3ED00739AB1 /* MyCustomCell.xib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +37,7 @@
 		61D0A58426B2A90D00FD68FF /* FavoriteFilmsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteFilmsViewController.swift; sourceTree = "<group>"; };
 		61EDC4AE26B406020016854F /* JSONModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONModel.swift; sourceTree = "<group>"; };
 		8C6A4A082DAAB51300739AB1 /* MyCustomCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyCustomCell.swift; sourceTree = "<group>"; };
+		8C6A4A0C2DAEC3ED00739AB1 /* MyCustomCell.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = MyCustomCell.xib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +74,7 @@
 				61D0A56726B2833C00FD68FF /* SceneDelegate.swift */,
 				61D0A56926B2833C00FD68FF /* MainViewController.swift */,
 				8C6A4A082DAAB51300739AB1 /* MyCustomCell.swift */,
+				8C6A4A0C2DAEC3ED00739AB1 /* MyCustomCell.xib */,
 				61D0A57B26B2A86C00FD68FF /* DetailFilmViewController.swift */,
 				61D0A57E26B2A8DE00FD68FF /* FilmPicsViewController.swift */,
 				61D0A58126B2A8FA00FD68FF /* FullPicViewController.swift */,
@@ -144,6 +147,7 @@
 			files = (
 				61D0A57226B2833D00FD68FF /* LaunchScreen.storyboard in Resources */,
 				61D0A56F26B2833D00FD68FF /* Assets.xcassets in Resources */,
+				8C6A4A0D2DAEC3ED00739AB1 /* MyCustomCell.xib in Resources */,
 				61D0A56D26B2833C00FD68FF /* Main.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -9,8 +9,9 @@ class MainViewController: UIViewController, UICollectionViewDelegate, UICollecti
     private let collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
-        layout.minimumInteritemSpacing = 10 // Отступ между ячейками по горизонтали
+        layout.minimumInteritemSpacing = 8// Отступ между ячейками по горизонтали
         layout.minimumLineSpacing = 10 // Отступ между строками
+        layout.sectionInset = UIEdgeInsets(top: 20, left: 10, bottom: 20, right: 10)
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.backgroundColor = .white
@@ -50,6 +51,12 @@ class MainViewController: UIViewController, UICollectionViewDelegate, UICollecti
         
         filteredArray = testArray
     }
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.navigationBar.isHidden = false
+        title = "Films"
+    }
+
     
     private func setupSearchBar() {
         searchBar.delegate = self
@@ -67,7 +74,9 @@ class MainViewController: UIViewController, UICollectionViewDelegate, UICollecti
         collectionView.dataSource = self
         
         // Зарегистрировать вашу кастомную ячейку
-        collectionView.register(MyCustomCell.self, forCellWithReuseIdentifier: "MyCustomCell")
+        let nib = UINib(nibName: "MyCustomCell", bundle: nil)
+        collectionView.register(nib, forCellWithReuseIdentifier: "MyCustomCell")
+
         
         view.addSubview(collectionView)
         
@@ -103,10 +112,17 @@ class MainViewController: UIViewController, UICollectionViewDelegate, UICollecti
     
     // Размеры для ячеек
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        let width = collectionView.frame.width / 2 - 15 // 50% ширины экрана минус отступ
-        let height: CGFloat = 250 // Можно настроить высоту ячеек
-        return CGSize(width: width, height: height)
+        let layout = collectionViewLayout as! UICollectionViewFlowLayout
+        let insets = layout.sectionInset
+        let spacing = layout.minimumInteritemSpacing
+        
+        let totalSpacing = insets.left + insets.right + spacing
+        let itemWidth = (collectionView.frame.width - totalSpacing) / 2
+        let itemHeight: CGFloat = 250 // можешь менять под контент
+
+        return CGSize(width: itemWidth, height: itemHeight)
     }
+
     
     // MARK: - SearchBar Delegate
     
@@ -123,4 +139,12 @@ class MainViewController: UIViewController, UICollectionViewDelegate, UICollecti
         
         collectionView.reloadData()
     }
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let selectedFilm = isFiltering ? filteredArray[indexPath.row] : testArray[indexPath.row]
+        
+        let detailVC = DetailFilmViewController()
+        detailVC.film = selectedFilm
+        navigationController?.pushViewController(detailVC, animated: true)
+    }
+
 }
