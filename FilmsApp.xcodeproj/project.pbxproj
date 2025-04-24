@@ -18,6 +18,7 @@
 		61D0A58226B2A8FA00FD68FF /* FullPicViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61D0A58126B2A8FA00FD68FF /* FullPicViewController.swift */; };
 		61D0A58526B2A90D00FD68FF /* FavoriteFilmsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61D0A58426B2A90D00FD68FF /* FavoriteFilmsViewController.swift */; };
 		61EDC4AF26B406020016854F /* JSONModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61EDC4AE26B406020016854F /* JSONModel.swift */; };
+		8C31EECD2DBAA84F00B7D74B /* PosterFullViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C31EECC2DBAA84F00B7D74B /* PosterFullViewController.swift */; };
 		8C6A4A092DAAB51300739AB1 /* MyCustomCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C6A4A082DAAB51300739AB1 /* MyCustomCell.swift */; };
 		8C6A4A0D2DAEC3ED00739AB1 /* MyCustomCell.xib in Resources */ = {isa = PBXBuildFile; fileRef = 8C6A4A0C2DAEC3ED00739AB1 /* MyCustomCell.xib */; };
 /* End PBXBuildFile section */
@@ -36,6 +37,7 @@
 		61D0A58126B2A8FA00FD68FF /* FullPicViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullPicViewController.swift; sourceTree = "<group>"; };
 		61D0A58426B2A90D00FD68FF /* FavoriteFilmsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteFilmsViewController.swift; sourceTree = "<group>"; };
 		61EDC4AE26B406020016854F /* JSONModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONModel.swift; sourceTree = "<group>"; };
+		8C31EECC2DBAA84F00B7D74B /* PosterFullViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterFullViewController.swift; sourceTree = "<group>"; };
 		8C6A4A082DAAB51300739AB1 /* MyCustomCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyCustomCell.swift; sourceTree = "<group>"; };
 		8C6A4A0C2DAEC3ED00739AB1 /* MyCustomCell.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = MyCustomCell.xib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -81,6 +83,7 @@
 				61D0A58426B2A90D00FD68FF /* FavoriteFilmsViewController.swift */,
 				61EDC4AE26B406020016854F /* JSONModel.swift */,
 				61D0A56B26B2833C00FD68FF /* Main.storyboard */,
+				8C31EECC2DBAA84F00B7D74B /* PosterFullViewController.swift */,
 				61D0A56E26B2833D00FD68FF /* Assets.xcassets */,
 				61D0A57026B2833D00FD68FF /* LaunchScreen.storyboard */,
 				61D0A57326B2833D00FD68FF /* Info.plist */,
@@ -165,6 +168,7 @@
 				61D0A56A26B2833C00FD68FF /* MainViewController.swift in Sources */,
 				61D0A56626B2833C00FD68FF /* AppDelegate.swift in Sources */,
 				61D0A56826B2833C00FD68FF /* SceneDelegate.swift in Sources */,
+				8C31EECD2DBAA84F00B7D74B /* PosterFullViewController.swift in Sources */,
 				61EDC4AF26B406020016854F /* JSONModel.swift in Sources */,
 				61D0A57F26B2A8DE00FD68FF /* FilmPicsViewController.swift in Sources */,
 				61D0A57C26B2A86C00FD68FF /* DetailFilmViewController.swift in Sources */,

@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="17701" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="7pR-1m-8Iw">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="21507" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="7pR-1m-8Iw">
     <device id="retina6_1" orientation="portrait" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="17703"/>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="21505"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="System colors in document resources" minToolsVersion="11.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
@@ -38,6 +39,32 @@
                 <placeholder placeholderIdentifier="IBFirstResponder" id="1kS-7b-oDB" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
             <point key="canvasLocation" x="1710" y="92"/>
+        </scene>
+        <!--Poster Full View Controller-->
+        <scene sceneID="FTp-xE-cZ6">
+            <objects>
+                <viewController storyboardIdentifier="PosterFullViewController" id="n7Y-0a-WVI" customClass="PosterFullViewController" customModule="FilmsApp" customModuleProvider="target" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="mn3-ja-9ec">
+                        <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="yEg-Wk-qUZ">
+                                <rect key="frame" x="0.0" y="48" width="414" height="814"/>
+                            </imageView>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="rjt-sT-bnV"/>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                        <constraints>
+                            <constraint firstItem="rjt-sT-bnV" firstAttribute="trailing" secondItem="yEg-Wk-qUZ" secondAttribute="trailing" id="C6U-mq-knp"/>
+                            <constraint firstItem="rjt-sT-bnV" firstAttribute="bottom" secondItem="yEg-Wk-qUZ" secondAttribute="bottom" id="ECU-dS-New"/>
+                            <constraint firstItem="yEg-Wk-qUZ" firstAttribute="top" secondItem="rjt-sT-bnV" secondAttribute="top" id="FT9-Dd-Jag"/>
+                            <constraint firstItem="yEg-Wk-qUZ" firstAttribute="leading" secondItem="rjt-sT-bnV" secondAttribute="leading" id="WVH-cb-F14"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="UyE-Xo-EO9" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="1743" y="763"/>
         </scene>
         <!--Film Pics View Controller-->
         <scene sceneID="76N-ta-aCH">
@@ -90,7 +117,7 @@
                 <navigationController automaticallyAdjustsScrollViewInsets="NO" id="7pR-1m-8Iw" sceneMemberID="viewController">
                     <toolbarItems/>
                     <navigationBar key="navigationBar" contentMode="scaleToFill" id="7Pn-sf-l90">
-                        <rect key="frame" x="0.0" y="44" width="414" height="44"/>
+                        <rect key="frame" x="0.0" y="48" width="414" height="44"/>
                         <autoresizingMask key="autoresizingMask"/>
                     </navigationBar>
                     <nil name="viewControllers"/>
