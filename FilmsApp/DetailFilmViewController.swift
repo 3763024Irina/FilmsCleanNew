@@ -1,12 +1,9 @@
-// DetailFilmViewController.swift
-// FilmsApp
-
 import UIKit
 
 class DetailFilmViewController: UIViewController {
     
     // MARK: - Public Properties
-    var film: TestModel? // Получаем модель фильма извне
+    var film: TestModel? // Модель фильма, передаётся извне
     
     // MARK: - UI Elements
     private let posterImageView = UIImageView()
@@ -22,11 +19,11 @@ class DetailFilmViewController: UIViewController {
         view.backgroundColor = .white
         setupUI()
         configureWithFilm()
+        setupDoubleTapGesture()
     }
     
     // MARK: - UI Setup
     private func setupUI() {
-        // Настройка UI-элементов
         [posterImageView, titleLabel, yearLabel, ratingLabel, backdropImageView, overviewLabel].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview($0)
@@ -38,7 +35,10 @@ class DetailFilmViewController: UIViewController {
         overviewLabel.font = .systemFont(ofSize: 16)
         overviewLabel.numberOfLines = 0
         
-        // Разметка
+        posterImageView.contentMode = .scaleAspectFill
+        posterImageView.clipsToBounds = true
+        posterImageView.isUserInteractionEnabled = true
+        
         NSLayoutConstraint.activate([
             posterImageView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
             posterImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
@@ -76,9 +76,26 @@ class DetailFilmViewController: UIViewController {
         ratingLabel.text = "Рейтинг: \(film.testRating ?? "-")"
         overviewLabel.text = "Описание будет позже..."
         
-        if let posterName = film.testPic {
-            posterImageView.image = UIImage(named: posterName)
-            backdropImageView.image = UIImage(named: posterName)
+        if let posterName = film.testPic,
+           let image = UIImage(named: posterName) {
+            posterImageView.image = image
+            backdropImageView.image = image
         }
+    }
+    
+    // MARK: - Gesture
+    private func setupDoubleTapGesture() {
+        let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(handlePosterDoubleTap))
+        doubleTapGesture.numberOfTapsRequired = 2
+        posterImageView.addGestureRecognizer(doubleTapGesture)
+    }
+    
+    @objc private func handlePosterDoubleTap() {
+        guard let image = posterImageView.image else { return }
+        
+        let fullImageVC = FullscreenImageViewController()
+        fullImageVC.modalPresentationStyle = .fullScreen
+        fullImageVC.image = image
+        present(fullImageVC, animated: true)
     }
 }

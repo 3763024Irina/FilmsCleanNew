@@ -1,11 +1,11 @@
 import UIKit
 
 class MainViewController: UIViewController, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UISearchBarDelegate {
-    
+
     private var testArray: [TestModel] = []
     private var filteredArray: [TestModel] = []
     private var isFiltering = false
-    
+
     private let collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
@@ -17,23 +17,58 @@ class MainViewController: UIViewController, UICollectionViewDelegate, UICollecti
         collectionView.backgroundColor = .white
         return collectionView
     }()
-    
+
     private let searchBar: UISearchBar = {
         let searchBar = UISearchBar()
         searchBar.translatesAutoresizingMaskIntoConstraints = false
         searchBar.placeholder = "Search films"
         return searchBar
     }()
-    
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        
         view.backgroundColor = .white
         setupSearchBar()
         setupCollectionView()
-    
+        setupData()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.navigationBar.isHidden = false
+        title = "Films"
+    }
+
+    private func setupSearchBar() {
+        searchBar.delegate = self
+        view.addSubview(searchBar)
+
+        NSLayoutConstraint.activate([
+            searchBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            searchBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            searchBar.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+    }
+
+    private func setupCollectionView() {
+        collectionView.delegate = self
+        collectionView.dataSource = self
+
+        let nib = UINib(nibName: "MyCustomCell", bundle: nil)
+        collectionView.register(nib, forCellWithReuseIdentifier: "MyCustomCell")
+
+        view.addSubview(collectionView)
+
+        NSLayoutConstraint.activate([
+            collectionView.topAnchor.constraint(equalTo: searchBar.bottomAnchor),
+            collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+    }
+
+    private func setupData() {
         testArray = [
-         
             TestModel(testPic: "image1", testTitle: "Inception", testYeah: "2010", testRating: "8.8"),
             TestModel(testPic: "image2", testTitle: "Titanic", testYeah: "1997", testRating: "7.8"),
             TestModel(testPic: "image3", testTitle: "Avatar", testYeah: "2009", testRating: "7.9"),
@@ -50,42 +85,7 @@ class MainViewController: UIViewController, UICollectionViewDelegate, UICollecti
             TestModel(testPic: "image14", testTitle: "Рабыня Изаура", testYeah: "1985", testRating: "9.0"),
             TestModel(testPic: "image15", testTitle: "Добрыня Никитич", testYeah: "2000", testRating: "9.5")
         ]
-
         filteredArray = testArray
-    }
-
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        navigationController?.navigationBar.isHidden = false
-        title = "Films"
-    }
-
-    private func setupSearchBar() {
-        searchBar.delegate = self
-        view.addSubview(searchBar)
-        
-        NSLayoutConstraint.activate([
-            searchBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            searchBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            searchBar.trailingAnchor.constraint(equalTo: view.trailingAnchor)
-        ])
-    }
-
-    private func setupCollectionView() {
-        collectionView.delegate = self
-        collectionView.dataSource = self
-        
-        let nib = UINib(nibName: "MyCustomCell", bundle: nil)
-        collectionView.register(nib, forCellWithReuseIdentifier: "MyCustomCell")
-
-        view.addSubview(collectionView)
-        
-        NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: searchBar.bottomAnchor),
-            collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
     }
 
     // MARK: - UICollectionView DataSource
@@ -98,17 +98,29 @@ class MainViewController: UIViewController, UICollectionViewDelegate, UICollecti
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "MyCustomCell", for: indexPath) as! MyCustomCell
         let model = isFiltering ? filteredArray[indexPath.row] : testArray[indexPath.row]
 
-        if let filmTitle = model.testTitle, let releaseYear = model.testYeah, let rating = model.testRating, let posterPreview = model.testPic {
-            let isImageOnly = posterPreview.isEmpty
+        if let title = model.testTitle,
+           let year = model.testYeah,
+           let rating = model.testRating,
+           let imageName = model.testPic {
 
-            let myModel = MyCustomCell.MyModel(filmTitle: filmTitle, releaseYeah: releaseYear, rating: rating, posterPreview: posterPreview, isImageOnly: isImageOnly)
-            cell.configure(with: myModel)
+            let cellModel = MyCustomCell.MyModel(
+                filmTitle: title,
+                releaseYeah: year,
+                rating: rating,
+                posterPreview: imageName,
+                isImageOnly: false
+            )
+
+            cell.configure(with: cellModel)
 
             cell.onDoubleTap = { [weak self] in
-                let fullPosterVC = PosterFullViewController()
-                fullPosterVC.posterImageName = posterPreview
+                guard let strongSelf = self else { return }
+                guard let image = UIImage(named: imageName) else { return }
+
+                let fullPosterVC = FullscreenImageViewController()
+                fullPosterVC.image = image
                 fullPosterVC.modalPresentationStyle = .fullScreen
-                self?.present(fullPosterVC, animated: true, completion: nil)
+                strongSelf.present(fullPosterVC, animated: true)
             }
         }
 
@@ -133,17 +145,15 @@ class MainViewController: UIViewController, UICollectionViewDelegate, UICollecti
 
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         isFiltering = !searchText.isEmpty
-        
-        if isFiltering {
-            filteredArray = testArray.filter { model in
-                return model.testTitle?.lowercased().contains(searchText.lowercased()) ?? false
-            }
-        } else {
-            filteredArray = testArray
-        }
+
+        filteredArray = isFiltering
+            ? testArray.filter { $0.testTitle?.lowercased().contains(searchText.lowercased()) ?? false }
+            : testArray
 
         collectionView.reloadData()
     }
+
+    // MARK: - Navigation to Detail View
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let selectedFilm = isFiltering ? filteredArray[indexPath.row] : testArray[indexPath.row]
