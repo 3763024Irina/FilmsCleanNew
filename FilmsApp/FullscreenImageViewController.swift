@@ -2,21 +2,28 @@ import UIKit
 
 class FullscreenImageViewController: UIViewController {
     
-    var image: UIImage? // передаем готовое изображение
-    
+    var image: UIImage?
+    var posterImageName: String?
+
     private let imageView = UIImageView()
+    private let closeButton = UIButton(type: .system)
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        
+        if let name = posterImageName {
+            image = UIImage(named: name)
+        }
+
         setupImageView()
-        setupCloseGesture()
+        setupCloseButton()
     }
 
     private func setupImageView() {
         imageView.translatesAutoresizingMaskIntoConstraints = false
         imageView.contentMode = .scaleAspectFit
-        imageView.image = image // устанавливаем изображение
+        imageView.image = image
         view.addSubview(imageView)
 
         NSLayoutConstraint.activate([
@@ -27,9 +34,21 @@ class FullscreenImageViewController: UIViewController {
         ])
     }
 
-    private func setupCloseGesture() {
-        let tap = UITapGestureRecognizer(target: self, action: #selector(closeFullscreen))
-        view.addGestureRecognizer(tap)
+    private func setupCloseButton() {
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        closeButton.setTitle("Close", for: .normal)
+        closeButton.setTitleColor(.white, for: .normal)
+        closeButton.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        closeButton.layer.cornerRadius = 8
+        closeButton.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+        closeButton.addTarget(self, action: #selector(closeFullscreen), for: .touchUpInside)
+
+        view.addSubview(closeButton)
+
+        NSLayoutConstraint.activate([
+            closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            closeButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16)
+        ])
     }
 
     @objc private func closeFullscreen() {

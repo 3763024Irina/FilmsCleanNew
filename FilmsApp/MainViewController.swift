@@ -1,10 +1,11 @@
 import UIKit
 
-class MainViewController: UIViewController, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UISearchBarDelegate {
-
+class MainViewController: UIViewController {
+    
     private var testArray: [TestModel] = []
     private var filteredArray: [TestModel] = []
     private var isFiltering = false
+    var selectedStartPoint: CGPoint = .zero
 
     private let collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -69,6 +70,7 @@ class MainViewController: UIViewController, UICollectionViewDelegate, UICollecti
 
     private func setupData() {
         testArray = [
+    
             TestModel(testPic: "image1", testTitle: "Inception", testYeah: "2010", testRating: "8.8"),
             TestModel(testPic: "image2", testTitle: "Titanic", testYeah: "1997", testRating: "7.8"),
             TestModel(testPic: "image3", testTitle: "Avatar", testYeah: "2009", testRating: "7.9"),
@@ -83,19 +85,37 @@ class MainViewController: UIViewController, UICollectionViewDelegate, UICollecti
             TestModel(testPic: "image12", testTitle: "Fight Club", testYeah: "1999", testRating: "8.8"),
             TestModel(testPic: "image13", testTitle: "Interstellar", testYeah: "2014", testRating: "8.6"),
             TestModel(testPic: "image14", testTitle: "Рабыня Изаура", testYeah: "1985", testRating: "9.0"),
-            TestModel(testPic: "image15", testTitle: "Добрыня Никитич", testYeah: "2000", testRating: "9.5")
+            TestModel(testPic: "image15", testTitle: "Добрыня Никитич", testYeah: "2000", testRating: "9.5")// другие фильмы...
         ]
         filteredArray = testArray
     }
+}
 
-    // MARK: - UICollectionView DataSource
+// MARK: - UICollectionViewDataSource, Delegate & FlowLayout
+extension MainViewController: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout, MyCustomCellDelegate {
+    func didDoubleTapPoster(image: UIImage, startPoint: CGPoint) {
+        let fullscreenVC = ImageFullscreenViewController()
+        fullscreenVC.image = image
+        fullscreenVC.startPoint = startPoint
+        selectedStartPoint = startPoint // для кастомной анимации, если используешь RoundingTransition
+
+        fullscreenVC.modalPresentationStyle = .custom
+        fullscreenVC.transitioningDelegate = self
+
+        present(fullscreenVC, animated: true)
+    }
+
+    
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return isFiltering ? filteredArray.count : testArray.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "MyCustomCell", for: indexPath) as! MyCustomCell
+        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "MyCustomCell", for: indexPath) as? MyCustomCell else {
+            return UICollectionViewCell()
+        }
+
         let model = isFiltering ? filteredArray[indexPath.row] : testArray[indexPath.row]
 
         if let title = model.testTitle,
@@ -112,54 +132,71 @@ class MainViewController: UIViewController, UICollectionViewDelegate, UICollecti
             )
 
             cell.configure(with: cellModel)
-
-            cell.onDoubleTap = { [weak self] in
-                guard let strongSelf = self else { return }
-                guard let image = UIImage(named: imageName) else { return }
-
-                let fullPosterVC = FullscreenImageViewController()
-                fullPosterVC.image = image
-                fullPosterVC.modalPresentationStyle = .fullScreen
-                strongSelf.present(fullPosterVC, animated: true)
-            }
+            cell.delegate = self // Устанавливаем делегат для обработки двойного тапа
         }
 
         return cell
     }
 
-    // MARK: - UICollectionView DelegateFlowLayout
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let selectedFilm = isFiltering ? filteredArray[indexPath.item] : testArray[indexPath.item]
+
+        let detailVC = DetailFilmViewController()
+        detailVC.film = selectedFilm
+
+        if let cell = collectionView.cellForItem(at: indexPath) {
+            let center = cell.center
+            selectedStartPoint = collectionView.convert(center, to: view)
+        }
+
+        detailVC.start = selectedStartPoint
+        detailVC.modalPresentationStyle = .custom
+        detailVC.transitioningDelegate = self
+        present(detailVC, animated: true)
+    }
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let layout = collectionViewLayout as! UICollectionViewFlowLayout
         let insets = layout.sectionInset
         let spacing = layout.minimumInteritemSpacing
-
         let totalSpacing = insets.left + insets.right + spacing
         let itemWidth = (collectionView.frame.width - totalSpacing) / 2
-        let itemHeight: CGFloat = 250
-
-        return CGSize(width: itemWidth, height: itemHeight)
+        return CGSize(width: itemWidth, height: 250)
     }
 
-    // MARK: - SearchBar Delegate
+    // MARK: - MyCustomCellDelegate
+    func didDoubleTapCell(cell: MyCustomCell) {
+        // Здесь можно обработать двойной тап по ячейке, например, открыть полноэкранное изображение
+        // Поскольку мы убираем PosterFullscreenViewController, обработку можно выполнить по-другому
+        print("Double tap detected on cell")
+    }
+}
 
+// MARK: - UISearchBarDelegate
+extension MainViewController: UISearchBarDelegate {
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         isFiltering = !searchText.isEmpty
-
         filteredArray = isFiltering
-            ? testArray.filter { $0.testTitle?.lowercased().contains(searchText.lowercased()) ?? false }
-            : testArray
-
+        ? testArray.filter { $0.testTitle?.lowercased().contains(searchText.lowercased()) ?? false }
+        : testArray
         collectionView.reloadData()
     }
+}
 
-    // MARK: - Navigation to Detail View
-
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let selectedFilm = isFiltering ? filteredArray[indexPath.row] : testArray[indexPath.row]
-
-        let detailVC = DetailFilmViewController()
-        detailVC.film = selectedFilm
-        navigationController?.pushViewController(detailVC, animated: true)
+// MARK: - UIViewControllerTransitioningDelegate
+extension MainViewController: UIViewControllerTransitioningDelegate {
+    func animationController(forPresented presented: UIViewController, presenting: UIViewController, source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        let transition = RoundingTransition()
+        transition.transitionProfile = .show
+        transition.start = selectedStartPoint
+        return transition
     }
+
+    func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        let transition = RoundingTransition()
+        transition.transitionProfile = .pop
+        transition.start = selectedStartPoint
+        return transition
+    }
+
 }

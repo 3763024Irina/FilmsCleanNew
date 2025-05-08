@@ -21,6 +21,8 @@
 		8C31EECD2DBAA84F00B7D74B /* FullscreenImageViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C31EECC2DBAA84F00B7D74B /* FullscreenImageViewController.swift */; };
 		8C6A4A092DAAB51300739AB1 /* MyCustomCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C6A4A082DAAB51300739AB1 /* MyCustomCell.swift */; };
 		8C6A4A0D2DAEC3ED00739AB1 /* MyCustomCell.xib in Resources */ = {isa = PBXBuildFile; fileRef = 8C6A4A0C2DAEC3ED00739AB1 /* MyCustomCell.xib */; };
+		8CB55D432DC1481F004F27A0 /* RoundingTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB55D422DC1481F004F27A0 /* RoundingTransition.swift */; };
+		8CB55D492DCD0C88004F27A0 /* ImageFullscreenViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB55D482DCD0C88004F27A0 /* ImageFullscreenViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +42,8 @@
 		8C31EECC2DBAA84F00B7D74B /* FullscreenImageViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullscreenImageViewController.swift; sourceTree = "<group>"; };
 		8C6A4A082DAAB51300739AB1 /* MyCustomCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyCustomCell.swift; sourceTree = "<group>"; };
 		8C6A4A0C2DAEC3ED00739AB1 /* MyCustomCell.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = MyCustomCell.xib; sourceTree = "<group>"; };
+		8CB55D422DC1481F004F27A0 /* RoundingTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundingTransition.swift; sourceTree = "<group>"; };
+		8CB55D482DCD0C88004F27A0 /* ImageFullscreenViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageFullscreenViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +82,8 @@
 				8C6A4A082DAAB51300739AB1 /* MyCustomCell.swift */,
 				8C6A4A0C2DAEC3ED00739AB1 /* MyCustomCell.xib */,
 				61D0A57B26B2A86C00FD68FF /* DetailFilmViewController.swift */,
+				8CB55D482DCD0C88004F27A0 /* ImageFullscreenViewController.swift */,
+				8CB55D422DC1481F004F27A0 /* RoundingTransition.swift */,
 				61D0A57E26B2A8DE00FD68FF /* FilmPicsViewController.swift */,
 				61D0A58126B2A8FA00FD68FF /* FullPicViewController.swift */,
 				61D0A58426B2A90D00FD68FF /* FavoriteFilmsViewController.swift */,
@@ -162,6 +168,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8CB55D432DC1481F004F27A0 /* RoundingTransition.swift in Sources */,
 				8C6A4A092DAAB51300739AB1 /* MyCustomCell.swift in Sources */,
 				61D0A58526B2A90D00FD68FF /* FavoriteFilmsViewController.swift in Sources */,
 				61D0A58226B2A8FA00FD68FF /* FullPicViewController.swift in Sources */,
@@ -172,6 +179,7 @@
 				61EDC4AF26B406020016854F /* JSONModel.swift in Sources */,
 				61D0A57F26B2A8DE00FD68FF /* FilmPicsViewController.swift in Sources */,
 				61D0A57C26B2A86C00FD68FF /* DetailFilmViewController.swift in Sources */,
+				8CB55D492DCD0C88004F27A0 /* ImageFullscreenViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
