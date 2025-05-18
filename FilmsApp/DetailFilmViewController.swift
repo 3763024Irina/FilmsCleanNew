@@ -1,4 +1,5 @@
 import UIKit
+import Foundation
 
 class DetailFilmViewController: UIViewController, UIViewControllerTransitioningDelegate {
     enum TransitionProfile {
@@ -9,7 +10,9 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
     var transitionProfile: TransitionProfile = .show
     var start: CGPoint = .zero
     var transition = RoundingTransition()
-    var film: TestModel?
+    var cameFromFav: Bool = false
+    
+    var film: Item?
 
     private let posterImageView = UIImageView()
     private let titleLabel = UILabel()
@@ -17,16 +20,21 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
     private let ratingLabel = UILabel()
     private let backdropImageView = UIImageView()
     private let overviewLabel = UILabel()
+    
+    private let idLabel = UILabel()
+    private let likeButton = UIButton(type: .system)
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
         transitioningDelegate = self
-        transition.start = start // ← ВАЖНО!
+        transition.start = start
+        
         setupUI()
         configureWithFilm()
         setupDoubleTapGesture()
         setupCloseButton()
+        setupLikeButton()
     }
 
     private func setupCloseButton() {
@@ -34,7 +42,6 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
         closeButton.setTitle("Close", for: .normal)
         closeButton.translatesAutoresizingMaskIntoConstraints = false
         closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
-
         view.addSubview(closeButton)
 
         NSLayoutConstraint.activate([
@@ -48,7 +55,7 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
     }
 
     private func setupUI() {
-        [posterImageView, titleLabel, yearLabel, ratingLabel, backdropImageView, overviewLabel].forEach {
+        [posterImageView, titleLabel, yearLabel, ratingLabel, backdropImageView, overviewLabel, idLabel, likeButton].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview($0)
         }
@@ -58,6 +65,10 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
         ratingLabel.font = .systemFont(ofSize: 18)
         overviewLabel.font = .systemFont(ofSize: 16)
         overviewLabel.numberOfLines = 0
+        idLabel.font = .italicSystemFont(ofSize: 14)
+        idLabel.textColor = .gray
+        
+        likeButton.titleLabel?.font = .systemFont(ofSize: 18)
 
         posterImageView.contentMode = .scaleAspectFill
         posterImageView.clipsToBounds = true
@@ -73,11 +84,17 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
             titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
 
-            yearLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            idLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
+            idLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            
+            yearLabel.topAnchor.constraint(equalTo: idLabel.bottomAnchor, constant: 8),
             yearLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
 
             ratingLabel.topAnchor.constraint(equalTo: yearLabel.bottomAnchor, constant: 8),
             ratingLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+
+            likeButton.centerYAnchor.constraint(equalTo: ratingLabel.centerYAnchor),
+            likeButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
 
             backdropImageView.topAnchor.constraint(equalTo: ratingLabel.bottomAnchor, constant: 16),
             backdropImageView.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
@@ -95,6 +112,7 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
         guard let film = film else { return }
 
         titleLabel.text = film.testTitle
+        idLabel.text = "ID: \(film.id ?? -1)"
         yearLabel.text = "Год выпуска: \(film.testYeah ?? "-")"
         ratingLabel.text = "Рейтинг: \(film.testRating ?? "-")"
         overviewLabel.text = "Описание будет позже..."
@@ -104,6 +122,26 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
             posterImageView.image = image
             backdropImageView.image = image
         }
+        
+        updateLikeButton()
+    }
+
+    private func setupLikeButton() {
+        likeButton.addTarget(self, action: #selector(likeButtonTapped), for: .touchUpInside)
+    }
+
+    private func updateLikeButton() {
+        guard let film = film else { return }
+        let title = film.isLiked ? "♥️ Liked" : "♡ Like"
+        likeButton.setTitle(title, for: .normal)
+        likeButton.setTitleColor(film.isLiked ? .systemRed : .systemBlue, for: .normal)
+    }
+
+    @objc private func likeButtonTapped() {
+        guard let film = film else { return }
+        film.isLiked.toggle()
+        updateLikeButton()
+        // Если надо, можно добавить сохранение состояния лайка здесь
     }
 
     private func setupDoubleTapGesture() {
@@ -122,6 +160,7 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
     }
 
     // MARK: - Transitioning Delegate
+
     func animationController(forPresented presented: UIViewController, presenting: UIViewController, source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
         transition.transitionProfile = .show
         return transition

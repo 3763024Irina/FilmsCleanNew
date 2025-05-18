@@ -1,11 +1,13 @@
 import UIKit
 
-class MainViewController: UIViewController {
+class MainViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, MyCustomCellDelegate {
     
-    private var testArray: [TestModel] = []
-    private var filteredArray: [TestModel] = []
-    private var isFiltering = false
-    var selectedStartPoint: CGPoint = .zero
+    private let model = Model()
+    private var testArray: [Item] = []
+    private var filteredArray: [Item] = []
+    private var isFiltering: Bool = false
+
+    private var selectedStartPoint: CGPoint = .zero
 
     private let collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -31,13 +33,13 @@ class MainViewController: UIViewController {
         view.backgroundColor = .white
         setupSearchBar()
         setupCollectionView()
-        setupData()
-    }
 
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
+        testArray = model.testArray
+
         navigationController?.navigationBar.isHidden = false
         title = "Films"
+        collectionView.dataSource = self
+        collectionView.delegate = self
     }
 
     private func setupSearchBar() {
@@ -68,44 +70,7 @@ class MainViewController: UIViewController {
         ])
     }
 
-    private func setupData() {
-        testArray = [
-    
-            TestModel(testPic: "image1", testTitle: "Inception", testYeah: "2010", testRating: "8.8"),
-            TestModel(testPic: "image2", testTitle: "Titanic", testYeah: "1997", testRating: "7.8"),
-            TestModel(testPic: "image3", testTitle: "Avatar", testYeah: "2009", testRating: "7.9"),
-            TestModel(testPic: "image4", testTitle: "The Dark Knight", testYeah: "2008", testRating: "9.0"),
-            TestModel(testPic: "image5", testTitle: "Forrest Gump", testYeah: "1994", testRating: "8.8"),
-            TestModel(testPic: "image6", testTitle: "The Matrix", testYeah: "1999", testRating: "8.7"),
-            TestModel(testPic: "image7", testTitle: "The Shawshank Redemption", testYeah: "1994", testRating: "9.3"),
-            TestModel(testPic: "image8", testTitle: "Gladiator", testYeah: "2000", testRating: "8.5"),
-            TestModel(testPic: "image9", testTitle: "The Godfather", testYeah: "1972", testRating: "9.2"),
-            TestModel(testPic: "image10", testTitle: "The Lion King", testYeah: "1994", testRating: "8.5"),
-            TestModel(testPic: "image11", testTitle: "Pulp Fiction", testYeah: "1994", testRating: "8.9"),
-            TestModel(testPic: "image12", testTitle: "Fight Club", testYeah: "1999", testRating: "8.8"),
-            TestModel(testPic: "image13", testTitle: "Interstellar", testYeah: "2014", testRating: "8.6"),
-            TestModel(testPic: "image14", testTitle: "Рабыня Изаура", testYeah: "1985", testRating: "9.0"),
-            TestModel(testPic: "image15", testTitle: "Добрыня Никитич", testYeah: "2000", testRating: "9.5")// другие фильмы...
-        ]
-        filteredArray = testArray
-    }
-}
-
-// MARK: - UICollectionViewDataSource, Delegate & FlowLayout
-extension MainViewController: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout, MyCustomCellDelegate {
-    func didDoubleTapPoster(image: UIImage, startPoint: CGPoint) {
-        let fullscreenVC = ImageFullscreenViewController()
-        fullscreenVC.image = image
-        fullscreenVC.startPoint = startPoint
-        selectedStartPoint = startPoint // для кастомной анимации, если используешь RoundingTransition
-
-        fullscreenVC.modalPresentationStyle = .custom
-        fullscreenVC.transitioningDelegate = self
-
-        present(fullscreenVC, animated: true)
-    }
-
-    
+    // MARK: - UICollectionViewDataSource, Delegate & FlowLayout
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return isFiltering ? filteredArray.count : testArray.count
@@ -116,24 +81,10 @@ extension MainViewController: UICollectionViewDataSource, UICollectionViewDelega
             return UICollectionViewCell()
         }
 
-        let model = isFiltering ? filteredArray[indexPath.row] : testArray[indexPath.row]
-
-        if let title = model.testTitle,
-           let year = model.testYeah,
-           let rating = model.testRating,
-           let imageName = model.testPic {
-
-            let cellModel = MyCustomCell.MyModel(
-                filmTitle: title,
-                releaseYeah: year,
-                rating: rating,
-                posterPreview: imageName,
-                isImageOnly: false
-            )
-
-            cell.configure(with: cellModel)
-            cell.delegate = self // Устанавливаем делегат для обработки двойного тапа
-        }
+        let item = isFiltering ? filteredArray[indexPath.item] : testArray[indexPath.item]
+        let isImageOnly = indexPath.item == 0
+        cell.configure(with: item, isImageOnly: isImageOnly)
+        cell.delegate = self
 
         return cell
     }
@@ -165,10 +116,44 @@ extension MainViewController: UICollectionViewDataSource, UICollectionViewDelega
     }
 
     // MARK: - MyCustomCellDelegate
-    func didDoubleTapCell(cell: MyCustomCell) {
-        // Здесь можно обработать двойной тап по ячейке, например, открыть полноэкранное изображение
-        // Поскольку мы убираем PosterFullscreenViewController, обработку можно выполнить по-другому
-        print("Double tap detected on cell")
+
+    func didDoubleTapPoster(for item: Item, startPoint: CGPoint) {
+        guard let index = (isFiltering ? filteredArray : testArray).firstIndex(where: { $0.id == item.id }) else {
+            return
+        }
+
+        if isFiltering {
+            filteredArray[index].isLiked.toggle()
+        } else {
+            testArray[index].isLiked.toggle()
+        }
+
+        let indexPath = IndexPath(item: index, section: 0)
+        collectionView.reloadItems(at: [indexPath])
+
+        let fullscreenVC = ImageFullscreenViewController()
+        fullscreenVC.image = UIImage(named: item.testPic ?? "") ?? UIImage(named: "placeholder")
+        fullscreenVC.startPoint = startPoint
+        selectedStartPoint = startPoint
+
+        fullscreenVC.modalPresentationStyle = .custom
+        fullscreenVC.transitioningDelegate = self
+        present(fullscreenVC, animated: true)
+    }
+
+    func didTapLikeButton(for item: Item) {
+        guard let index = (isFiltering ? filteredArray : testArray).firstIndex(where: { $0.id == item.id }) else {
+            return
+        }
+
+        if isFiltering {
+            filteredArray[index].isLiked.toggle()
+        } else {
+            testArray[index].isLiked.toggle()
+        }
+
+        let indexPath = IndexPath(item: index, section: 0)
+        collectionView.reloadItems(at: [indexPath])
     }
 }
 
@@ -177,8 +162,8 @@ extension MainViewController: UISearchBarDelegate {
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         isFiltering = !searchText.isEmpty
         filteredArray = isFiltering
-        ? testArray.filter { $0.testTitle?.lowercased().contains(searchText.lowercased()) ?? false }
-        : testArray
+            ? testArray.filter { $0.testTitle?.lowercased().contains(searchText.lowercased()) ?? false }
+            : testArray
         collectionView.reloadData()
     }
 }
@@ -198,5 +183,4 @@ extension MainViewController: UIViewControllerTransitioningDelegate {
         transition.start = selectedStartPoint
         return transition
     }
-
 }
