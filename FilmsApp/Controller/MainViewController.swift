@@ -1,13 +1,14 @@
 import UIKit
 
 class MainViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, MyCustomCellDelegate {
-    
-    private let model = Model()
+
     private var testArray: [Item] = []
     private var filteredArray: [Item] = []
     private var isFiltering: Bool = false
-
+    private var showingOnlyLiked: Bool = false
     private var selectedStartPoint: CGPoint = .zero
+
+    private let model = Model()
 
     private let collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -30,17 +31,34 @@ class MainViewController: UIViewController, UICollectionViewDataSource, UICollec
 
     override func viewDidLoad() {
         super.viewDidLoad()
+
         view.backgroundColor = .white
+        navigationController?.navigationBar.isHidden = false
+        title = "Films"
+
+        // Данные
+        testArray = model.testArray
+        filteredArray = testArray
+
         setupSearchBar()
         setupCollectionView()
 
-        testArray = model.testArray
-
-        navigationController?.navigationBar.isHidden = false
-        title = "Films"
-        collectionView.dataSource = self
-        collectionView.delegate = self
+        // Кнопка-сердечко
+        let heartButton = UIBarButtonItem(
+            image: UIImage(systemName: "heart.fill"),
+            style: .plain,
+            target: self,
+            action: #selector(showLikedMovies)
+        )
+        navigationItem.rightBarButtonItem = heartButton
     }
+
+    @objc func showLikedMovies() {
+        let likedVC = LikedFilmsViewController()
+        likedVC.likedFilms = testArray.filter { $0.isLiked }
+        navigationController?.pushViewController(likedVC, animated: true)
+    }
+
 
     private func setupSearchBar() {
         searchBar.delegate = self
@@ -82,8 +100,8 @@ class MainViewController: UIViewController, UICollectionViewDataSource, UICollec
         }
 
         let item = isFiltering ? filteredArray[indexPath.item] : testArray[indexPath.item]
-        let isImageOnly = indexPath.item == 0
-        cell.configure(with: item, isImageOnly: isImageOnly)
+        _ = indexPath.item == 0
+        cell.configure(with: item, isImageOnly: false)
         cell.delegate = self
 
         return cell
@@ -118,14 +136,11 @@ class MainViewController: UIViewController, UICollectionViewDataSource, UICollec
     // MARK: - MyCustomCellDelegate
 
     func didDoubleTapPoster(for item: Item, startPoint: CGPoint) {
-        guard let index = (isFiltering ? filteredArray : testArray).firstIndex(where: { $0.id == item.id }) else {
-            return
-        }
+        guard let index = testArray.firstIndex(where: { $0.id == item.id }) else { return }
+        testArray[index].isLiked.toggle()
 
         if isFiltering {
-            filteredArray[index].isLiked.toggle()
-        } else {
-            testArray[index].isLiked.toggle()
+            filteredArray = testArray.filter { $0.isLiked }
         }
 
         let indexPath = IndexPath(item: index, section: 0)
@@ -142,14 +157,13 @@ class MainViewController: UIViewController, UICollectionViewDataSource, UICollec
     }
 
     func didTapLikeButton(for item: Item) {
-        guard let index = (isFiltering ? filteredArray : testArray).firstIndex(where: { $0.id == item.id }) else {
-            return
-        }
+        guard let index = testArray.firstIndex(where: { $0.id == item.id }) else { return }
+        testArray[index].isLiked.toggle()
 
         if isFiltering {
-            filteredArray[index].isLiked.toggle()
-        } else {
-            testArray[index].isLiked.toggle()
+            filteredArray = showingOnlyLiked
+                ? testArray.filter { $0.isLiked }
+                : testArray
         }
 
         let indexPath = IndexPath(item: index, section: 0)
@@ -160,10 +174,20 @@ class MainViewController: UIViewController, UICollectionViewDataSource, UICollec
 // MARK: - UISearchBarDelegate
 extension MainViewController: UISearchBarDelegate {
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        isFiltering = !searchText.isEmpty
-        filteredArray = isFiltering
-            ? testArray.filter { $0.testTitle?.lowercased().contains(searchText.lowercased()) ?? false }
-            : testArray
+        isFiltering = !searchText.isEmpty || showingOnlyLiked
+
+        if showingOnlyLiked {
+            filteredArray = testArray.filter {
+                $0.isLiked && ($0.testTitle?.lowercased().contains(searchText.lowercased()) ?? false)
+            }
+        } else if !searchText.isEmpty {
+            filteredArray = testArray.filter {
+                $0.testTitle?.lowercased().contains(searchText.lowercased()) ?? false
+            }
+        } else {
+            filteredArray = testArray
+        }
+
         collectionView.reloadData()
     }
 }
