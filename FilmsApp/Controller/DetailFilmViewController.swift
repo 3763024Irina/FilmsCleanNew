@@ -140,24 +140,32 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
         
         titleLabel.text = film.testTitle
         idLabel.text = "ID: \(film.id)"
-        yearLabel.text = "Год выпуска: \(film.testYeah ?? "-")"
-        ratingLabel.text = "Рейтинг: \(film.testRating ?? "-")"
+        yearLabel.text = "Год выпуска: \(film.testYeah)"
+        ratingLabel.text = "Рейтинг: \(film.testRating)"
         overviewLabel.text = "Описание будет позже..."
         updateLikeButton()
         
-        let path = film.testPic
-        if !path.isEmpty {
-            let trimmedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            let urlString = imageBaseURL + posterSize + "/" + trimmedPath
-            if let url = URL(string: urlString) {
-                loadImage(from: url, into: posterImageView)
-                loadImage(from: url, into: backdropImageView)
-            }
-        } else {
+        let path = film.testPic.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        
+        guard !path.isEmpty else {
             posterImageView.image = UIImage(named: "placeholder")
             backdropImageView.image = UIImage(named: "placeholder")
+            return
         }
+        let urlString = "\(imageBaseURL)/\(posterSize)/\(path)"
+
+        guard let url = URL(string: urlString) else {
+            print("❌ Неверный URL: \(urlString)")
+            posterImageView.image = UIImage(named: "placeholder")
+            backdropImageView.image = UIImage(named: "placeholder")
+            return
+        }
+
+        print("📸 URL: \(url.absoluteString)")
+        loadImage(from: url, into: posterImageView)
+        loadImage(from: url, into: backdropImageView)
     }
+
 
 
     private func loadImage(from url: URL, into imageView: UIImageView) {
