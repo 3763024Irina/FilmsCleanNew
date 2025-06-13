@@ -1,17 +1,17 @@
 import UIKit
-import Foundation
+import RealmSwift
 
 class DetailFilmViewController: UIViewController, UIViewControllerTransitioningDelegate {
+
     enum TransitionProfile {
-        case show
-        case pop
+        case show, pop
     }
 
     var transitionProfile: TransitionProfile = .show
     var start: CGPoint = .zero
     var transition = RoundingTransition()
     var cameFromFav: Bool = false
-    
+
     var film: Item?
 
     private let posterImageView = UIImageView()
@@ -20,16 +20,21 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
     private let ratingLabel = UILabel()
     private let backdropImageView = UIImageView()
     private let overviewLabel = UILabel()
-    
     private let idLabel = UILabel()
     private let likeButton = UIButton(type: .system)
+
+    private let realm = try! Realm()
+    private static var imageCache = NSCache<NSString, UIImage>()
+
+    private let imageBaseURL = "https://image.tmdb.org/t/p/"
+    private let posterSize = "w500"
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
         transitioningDelegate = self
         transition.start = start
-        
+
         setupUI()
         configureWithFilm()
         setupDoubleTapGesture()
@@ -53,9 +58,30 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
     @objc private func closeTapped() {
         dismiss(animated: true)
     }
+    @objc private func handleDoubleTap() {
+        
+        guard let film = film, !film.testPic.isEmpty else { return }
+        let posterPath = film.testPic
+
+        let fullVC = ImageFullscreenViewController()
+        if let url = URL(string: "https://image.tmdb.org/t/p/w500/\(posterPath)") {
+            // Если хотите передать URL напрямую:
+            fullVC.imageUrl = url
+        } else {
+            // Если URL невалиден, передаем id и параметры для загрузки из Realm
+            fullVC.itemId = film.id
+            fullVC.imageBaseURL = imageBaseURL
+            fullVC.posterSize = posterSize
+        }
+        fullVC.modalPresentationStyle = .fullScreen
+        present(fullVC, animated: true)
+    }
+
+
 
     private func setupUI() {
-        [posterImageView, titleLabel, yearLabel, ratingLabel, backdropImageView, overviewLabel, idLabel, likeButton].forEach {
+        [posterImageView, titleLabel, yearLabel, ratingLabel,
+         backdropImageView, overviewLabel, idLabel, likeButton].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview($0)
         }
@@ -67,12 +93,13 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
         overviewLabel.numberOfLines = 0
         idLabel.font = .italicSystemFont(ofSize: 14)
         idLabel.textColor = .gray
-        
         likeButton.titleLabel?.font = .systemFont(ofSize: 18)
 
         posterImageView.contentMode = .scaleAspectFill
         posterImageView.clipsToBounds = true
         posterImageView.isUserInteractionEnabled = true
+        backdropImageView.contentMode = .scaleAspectFill
+        backdropImageView.clipsToBounds = true
 
         NSLayoutConstraint.activate([
             posterImageView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
@@ -86,7 +113,7 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
 
             idLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
             idLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            
+
             yearLabel.topAnchor.constraint(equalTo: idLabel.bottomAnchor, constant: 8),
             yearLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
 
@@ -110,20 +137,50 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
 
     private func configureWithFilm() {
         guard let film = film else { return }
-
+        
         titleLabel.text = film.testTitle
-        idLabel.text = "ID: \(film.id ?? -1)"
+        idLabel.text = "ID: \(film.id)"
         yearLabel.text = "Год выпуска: \(film.testYeah ?? "-")"
         ratingLabel.text = "Рейтинг: \(film.testRating ?? "-")"
         overviewLabel.text = "Описание будет позже..."
-
-        if let posterName = film.testPic,
-           let image = UIImage(named: posterName) {
-            posterImageView.image = image
-            backdropImageView.image = image
-        }
-        
         updateLikeButton()
+        
+        let path = film.testPic
+        if !path.isEmpty {
+            let trimmedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            let urlString = imageBaseURL + posterSize + "/" + trimmedPath
+            if let url = URL(string: urlString) {
+                loadImage(from: url, into: posterImageView)
+                loadImage(from: url, into: backdropImageView)
+            }
+        } else {
+            posterImageView.image = UIImage(named: "placeholder")
+            backdropImageView.image = UIImage(named: "placeholder")
+        }
+    }
+
+
+    private func loadImage(from url: URL, into imageView: UIImageView) {
+        if let cachedImage = Self.imageCache.object(forKey: url.absoluteString as NSString) {
+            imageView.image = cachedImage
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            guard let data = data,
+                  let image = UIImage(data: data),
+                  error == nil else {
+                DispatchQueue.main.async {
+                    imageView.image = UIImage(named: "placeholder")
+                }
+                return
+            }
+
+            Self.imageCache.setObject(image, forKey: url.absoluteString as NSString)
+            DispatchQueue.main.async {
+                imageView.image = image
+            }
+        }.resume()
     }
 
     private func setupLikeButton() {
@@ -139,29 +196,28 @@ class DetailFilmViewController: UIViewController, UIViewControllerTransitioningD
 
     @objc private func likeButtonTapped() {
         guard let film = film else { return }
-        film.isLiked.toggle()
-        updateLikeButton()
-        // Если надо, можно добавить сохранение состояния лайка здесь
+        do {
+            try realm.write {
+                film.isLiked.toggle()
+            }
+            updateLikeButton()
+        } catch {
+            print("❌ Ошибка обновления like в Realm: \(error)")
+        }
     }
 
     private func setupDoubleTapGesture() {
         let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap))
         doubleTapGesture.numberOfTapsRequired = 2
         posterImageView.addGestureRecognizer(doubleTapGesture)
+        posterImageView.isUserInteractionEnabled = true
     }
 
-    @objc private func handleDoubleTap() {
-        guard let posterImage = posterImageView.image else { return }
 
-        let fullImageVC = FullscreenImageViewController()
-        fullImageVC.image = posterImage
-        fullImageVC.modalPresentationStyle = .fullScreen
-        present(fullImageVC, animated: true)
-    }
-
-    // MARK: - Transitioning Delegate
-
-    func animationController(forPresented presented: UIViewController, presenting: UIViewController, source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+    // MARK: - Custom Transition
+    func animationController(forPresented presented: UIViewController,
+                             presenting: UIViewController,
+                             source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
         transition.transitionProfile = .show
         return transition
     }

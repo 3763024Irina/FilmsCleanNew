@@ -1,49 +1,78 @@
 import UIKit
+import RealmSwift
 
-class MainViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, MyCustomCellDelegate {
+class MainViewController: UIViewController {
 
-    private var testArray: [Item] = []
-    private var filteredArray: [Item] = []
-    private var isFiltering: Bool = false
-    private var showingOnlyLiked: Bool = false
-    private var selectedStartPoint: CGPoint = .zero
+    private var realm: Realm!
+    private var notificationToken: NotificationToken?
 
-    private let model = Model()
+    private var testArray: Results<Item>!
+    private var filteredArray: Results<Item>!
 
-    private let collectionView: UICollectionView = {
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .vertical
-        layout.minimumInteritemSpacing = 8
-        layout.minimumLineSpacing = 10
-        layout.sectionInset = UIEdgeInsets(top: 20, left: 10, bottom: 20, right: 10)
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.translatesAutoresizingMaskIntoConstraints = false
-        collectionView.backgroundColor = .white
-        return collectionView
-    }()
+    private var collectionView: UICollectionView!
+    private var searchBar: UISearchBar!
 
-    private let searchBar: UISearchBar = {
-        let searchBar = UISearchBar()
-        searchBar.translatesAutoresizingMaskIntoConstraints = false
-        searchBar.placeholder = "Search films"
-        return searchBar
-    }()
+    private var imageBaseURL: String = ""
+    private var posterSize: String = "w500"
+
+    private var showingLikedOnly = false
+
+    private let apiKey = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhYjM3NzZmMzU5ZmNlZjNiMjAzMDczNWNlZWEyZWVhZiIsIm5iZiI6MTc0MzUyNTMxNy4yMjQsInN1YiI6IjY3ZWMxNWM1ZTE2YzYxZGE0NDQyYjFkNSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.DMeofagrq7g5PKLJZxCre1RiVxScyuJcaDjIcGq8Mc8" 
 
     override func viewDidLoad() {
         super.viewDidLoad()
-
         view.backgroundColor = .white
-        navigationController?.navigationBar.isHidden = false
-        title = "Films"
 
-        // Данные
-        testArray = model.testArray
-        filteredArray = testArray
-
+        setupRealm()
         setupSearchBar()
         setupCollectionView()
+        setupNavigationBar()
 
-        // Кнопка-сердечко
+        testArray = realm.objects(Item.self).sorted(byKeyPath: "id", ascending: true)
+        filteredArray = testArray
+
+        notificationToken = testArray.observe { [weak self] changes in
+            guard let self = self else { return }
+            switch changes {
+            case .initial:
+                self.collectionView.reloadData()
+            case .update(_, let deletions, let insertions, let modifications):
+                self.collectionView.performBatchUpdates {
+                    self.collectionView.deleteItems(at: deletions.map { IndexPath(item: $0, section: 0) })
+                    self.collectionView.insertItems(at: insertions.map { IndexPath(item: $0, section: 0) })
+                    self.collectionView.reloadItems(at: modifications.map { IndexPath(item: $0, section: 0) })
+                }
+            case .error(let error):
+                fatalError("\(error)")
+            }
+        }
+
+        Task {
+            await fetchTMDbConfiguration()
+            await loadMoviesFromAPIIfNeeded()
+        }
+    }
+
+    private func setupRealm() {
+        let config = Realm.Configuration(
+            schemaVersion: 3,
+            migrationBlock: { migration, oldSchemaVersion in
+                if oldSchemaVersion < 3 { }
+            },
+            deleteRealmIfMigrationNeeded: true
+        )
+        Realm.Configuration.defaultConfiguration = config
+
+        do {
+            realm = try Realm()
+        } catch {
+            fatalError("Ошибка инициализации Realm: \(error)")
+        }
+    }
+
+    private func setupNavigationBar() {
+        navigationController?.navigationBar.isHidden = false
+        title = "Films"
         let heartButton = UIBarButtonItem(
             image: UIImage(systemName: "heart.fill"),
             style: .plain,
@@ -54,44 +83,175 @@ class MainViewController: UIViewController, UICollectionViewDataSource, UICollec
     }
 
     @objc func showLikedMovies() {
-        let likedVC = LikedFilmsViewController()
-        likedVC.likedFilms = testArray.filter { $0.isLiked }
-        navigationController?.pushViewController(likedVC, animated: true)
+        showingLikedOnly.toggle()
+        updateFilteredArray()
     }
 
+    private func updateFilteredArray() {
+        if let text = searchBar.text, !text.isEmpty {
+            if showingLikedOnly {
+                filteredArray = testArray.filter("isLiked == true AND testTitle CONTAINS[c] %@", text)
+            } else {
+                filteredArray = testArray.filter("testTitle CONTAINS[c] %@", text)
+            }
+        } else {
+            filteredArray = showingLikedOnly ? testArray.filter("isLiked == true") : testArray
+        }
+        collectionView.reloadData()
+    }
 
     private func setupSearchBar() {
+        searchBar = UISearchBar()
         searchBar.delegate = self
-        view.addSubview(searchBar)
-
-        NSLayoutConstraint.activate([
-            searchBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            searchBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            searchBar.trailingAnchor.constraint(equalTo: view.trailingAnchor)
-        ])
+        searchBar.placeholder = "Search movies"
+        navigationItem.titleView = searchBar
     }
 
     private func setupCollectionView() {
-        collectionView.delegate = self
-        collectionView.dataSource = self
+        let layout = UICollectionViewFlowLayout()
+        layout.minimumInteritemSpacing = 5
+        layout.minimumLineSpacing = 5
+        layout.sectionInset = UIEdgeInsets(top: 5, left: 5, bottom: 5, right: 5)
 
-        let nib = UINib(nibName: "MyCustomCell", bundle: nil)
-        collectionView.register(nib, forCellWithReuseIdentifier: "MyCustomCell")
+        collectionView = UICollectionView(frame: view.bounds, collectionViewLayout: layout)
+        collectionView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        collectionView.backgroundColor = .white
+        collectionView.dataSource = self
+        collectionView.delegate = self
+        collectionView.register(MyCustomCell.self, forCellWithReuseIdentifier: "MyCustomCell")
 
         view.addSubview(collectionView)
-
-        NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: searchBar.bottomAnchor),
-            collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
     }
 
-    // MARK: - UICollectionViewDataSource, Delegate & FlowLayout
+    private func fetchTMDbConfiguration() async {
+        guard !apiKey.isEmpty else {
+            print("API ключ не указан.")
+            return
+        }
 
+        guard let url = URL(string: "https://api.themoviedb.org/3/configuration") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, _) = try await URLSession.shared.data(for: request)
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let images = json["images"] as? [String: Any],
+               let baseURL = images["secure_base_url"] as? String,
+               let posterSizes = images["poster_sizes"] as? [String] {
+                imageBaseURL = baseURL
+                posterSize = posterSizes.contains("w500") ? "w500" : posterSizes.last ?? "w342"
+            }
+        } catch {
+            print("Ошибка конфигурации TMDb:", error)
+        }
+    }
+
+    private func loadMoviesFromAPIIfNeeded() async {
+        if realm.objects(Item.self).isEmpty {
+            await fetchPopularMovies()
+        }
+    }
+
+    private func fetchPopularMovies() async {
+        guard let url = URL(string: "https://api.themoviedb.org/3/movie/popular?language=ru-RU&page=1") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, _) = try await URLSession.shared.data(for: request)
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let results = json["results"] as? [[String: Any]] {
+                try realm.write {
+                    for movie in results {
+                        let item = Item()
+                        item.id = movie["id"] as? Int ?? 0
+                        item.testTitle = (movie["title"] as? String) ?? ""
+                        
+                        if let date = movie["release_date"] as? String, date.count >= 4 {
+                            item.testYeah = String(date.prefix(4))
+                        } else {
+                            item.testYeah = ""
+                        }
+
+                        if let rating = movie["vote_average"] as? Double {
+                            item.testRating = String(format: "%.1f", rating)
+                        } else {
+                            item.testRating = ""
+                        }
+
+                        item.testPic = (movie["poster_path"] as? String) ?? ""
+                        realm.add(item, update: .modified)
+                    }
+                }
+
+                DispatchQueue.main.async {
+                    self.updateFilteredArray()
+                }
+            }
+        } catch {
+            print("Ошибка загрузки фильмов:", error)
+        }
+    }
+
+    private func searchMovies(query: String) async {
+        guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://api.themoviedb.org/3/search/movie?query=\(encodedQuery)&language=ru-RU") else {
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "accept")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, _) = try await URLSession.shared.data(for: request)
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let results = json["results"] as? [[String: Any]] {
+                try realm.write {
+                    for movie in results {
+                        let item = Item()
+                        item.id = movie["id"] as? Int ?? 0
+                        item.testTitle = (movie["title"] as? String) ?? ""
+                        
+                        if let date = movie["release_date"] as? String, date.count >= 4 {
+                            item.testYeah = String(date.prefix(4))
+                        } else {
+                            item.testYeah = ""
+                        }
+
+                        if let rating = movie["vote_average"] as? Double {
+                            item.testRating = String(format: "%.1f", rating)
+                        } else {
+                            item.testRating = ""
+                        }
+
+                        item.testPic = (movie["poster_path"] as? String) ?? ""
+                        realm.add(item, update: .modified)
+                    }
+                }
+                DispatchQueue.main.async {
+                    self.updateFilteredArray()
+                }
+            }
+        } catch {
+            print("Ошибка поиска фильмов:", error)
+        }
+    }
+
+}
+
+// MARK: - UICollectionView
+
+extension MainViewController: UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return isFiltering ? filteredArray.count : testArray.count
+        return filteredArray.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -99,112 +259,50 @@ class MainViewController: UIViewController, UICollectionViewDataSource, UICollec
             return UICollectionViewCell()
         }
 
-        let item = isFiltering ? filteredArray[indexPath.item] : testArray[indexPath.item]
-        _ = indexPath.item == 0
-        cell.configure(with: item, isImageOnly: false)
+        let item = filteredArray[indexPath.item]
+        cell.configure(with: item, imageBaseURL: imageBaseURL, posterSize: posterSize)
         cell.delegate = self
-
         return cell
     }
 
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let selectedFilm = isFiltering ? filteredArray[indexPath.item] : testArray[indexPath.item]
-
-        let detailVC = DetailFilmViewController()
-        detailVC.film = selectedFilm
-
-        if let cell = collectionView.cellForItem(at: indexPath) {
-            let center = cell.center
-            selectedStartPoint = collectionView.convert(center, to: view)
-        }
-
-        detailVC.start = selectedStartPoint
-        detailVC.modalPresentationStyle = .custom
-        detailVC.transitioningDelegate = self
-        present(detailVC, animated: true)
-    }
-
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        let layout = collectionViewLayout as! UICollectionViewFlowLayout
-        let insets = layout.sectionInset
-        let spacing = layout.minimumInteritemSpacing
-        let totalSpacing = insets.left + insets.right + spacing
-        let itemWidth = (collectionView.frame.width - totalSpacing) / 2
-        return CGSize(width: itemWidth, height: 250)
-    }
-
-    // MARK: - MyCustomCellDelegate
-
-    func didDoubleTapPoster(for item: Item, startPoint: CGPoint) {
-        guard let index = testArray.firstIndex(where: { $0.id == item.id }) else { return }
-        testArray[index].isLiked.toggle()
-
-        if isFiltering {
-            filteredArray = testArray.filter { $0.isLiked }
-        }
-
-        let indexPath = IndexPath(item: index, section: 0)
-        collectionView.reloadItems(at: [indexPath])
-
-        let fullscreenVC = ImageFullscreenViewController()
-        fullscreenVC.image = UIImage(named: item.testPic ?? "") ?? UIImage(named: "placeholder")
-        fullscreenVC.startPoint = startPoint
-        selectedStartPoint = startPoint
-
-        fullscreenVC.modalPresentationStyle = .custom
-        fullscreenVC.transitioningDelegate = self
-        present(fullscreenVC, animated: true)
-    }
-
-    func didTapLikeButton(for item: Item) {
-        guard let index = testArray.firstIndex(where: { $0.id == item.id }) else { return }
-        testArray[index].isLiked.toggle()
-
-        if isFiltering {
-            filteredArray = showingOnlyLiked
-                ? testArray.filter { $0.isLiked }
-                : testArray
-        }
-
-        let indexPath = IndexPath(item: index, section: 0)
-        collectionView.reloadItems(at: [indexPath])
+        let width = (collectionView.frame.width - 15) / 2
+        return CGSize(width: width, height: width * 1.6)
     }
 }
 
 // MARK: - UISearchBarDelegate
+
 extension MainViewController: UISearchBarDelegate {
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        isFiltering = !searchText.isEmpty || showingOnlyLiked
+        updateFilteredArray()
 
-        if showingOnlyLiked {
-            filteredArray = testArray.filter {
-                $0.isLiked && ($0.testTitle?.lowercased().contains(searchText.lowercased()) ?? false)
+        if !searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+            Task {
+                await searchMovies(query: searchText)
             }
-        } else if !searchText.isEmpty {
-            filteredArray = testArray.filter {
-                $0.testTitle?.lowercased().contains(searchText.lowercased()) ?? false
-            }
-        } else {
-            filteredArray = testArray
         }
+    }
 
-        collectionView.reloadData()
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.resignFirstResponder()
     }
 }
 
-// MARK: - UIViewControllerTransitioningDelegate
-extension MainViewController: UIViewControllerTransitioningDelegate {
-    func animationController(forPresented presented: UIViewController, presenting: UIViewController, source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
-        let transition = RoundingTransition()
-        transition.transitionProfile = .show
-        transition.start = selectedStartPoint
-        return transition
-    }
+// MARK: - MyCustomCellDelegate
 
-    func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
-        let transition = RoundingTransition()
-        transition.transitionProfile = .pop
-        transition.start = selectedStartPoint
-        return transition
+extension MainViewController: MyCustomCellDelegate {
+    func didTapLikeButton(on cell: MyCustomCell) {
+        guard let indexPath = collectionView.indexPath(for: cell) else { return }
+        let item = filteredArray[indexPath.item]
+
+        do {
+            try realm.write {
+                item.isLiked.toggle()
+            }
+            updateFilteredArray()
+        } catch {
+            print("Ошибка при обновлении isLiked:", error)
+        }
     }
 }

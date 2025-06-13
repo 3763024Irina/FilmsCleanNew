@@ -1,124 +1,131 @@
 import UIKit
+
 protocol MyCustomCellDelegate: AnyObject {
-    func didDoubleTapPoster(for item: Item, startPoint: CGPoint)
-    func didTapLikeButton(for item: Item)
+    func didTapLikeButton(on cell: MyCustomCell)
 }
 
-
 class MyCustomCell: UICollectionViewCell {
-
-    weak var delegate: MyCustomCellDelegate?
-    private var currentItem: Item?
-
-    @IBOutlet weak var posterImageView: UIImageView!
-    @IBOutlet weak var filmTitleLabel: UILabel!
-    @IBOutlet weak var releaseYearLabel: UILabel!
-    @IBOutlet weak var ratingLabel: UILabel!
-
-    private let idLabel = UILabel()
+    
+    private let imageView = UIImageView()
+    private let titleLabel = UILabel()
+    private let yearLabel = UILabel()
+    private let ratingLabel = UILabel()
     private let likeButton = UIButton(type: .system)
+    
+    weak var delegate: MyCustomCellDelegate?
 
-    override func awakeFromNib() {
-        super.awakeFromNib()
+    private static var imageCache = NSCache<NSString, UIImage>()
+    private var currentImageURL: String?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
         setupUI()
-        setupGesture()
-        setupIdLabel()
-        setupLikeButton()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupUI()
     }
 
     private func setupUI() {
-        filmTitleLabel.numberOfLines = 0
-        filmTitleLabel.lineBreakMode = .byWordWrapping
-        filmTitleLabel.font = .systemFont(ofSize: 16, weight: .semibold)
-        filmTitleLabel.textColor = .black
+        contentView.backgroundColor = .white
+        contentView.layer.cornerRadius = 12
+        contentView.layer.shadowColor = UIColor.black.cgColor
+        contentView.layer.shadowOpacity = 0.1
+        contentView.layer.shadowOffset = CGSize(width: 0, height: 2)
+        contentView.layer.shadowRadius = 4
+        contentView.clipsToBounds = false
 
-        releaseYearLabel.font = .systemFont(ofSize: 14)
-        releaseYearLabel.textColor = .darkGray
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        imageView.image = UIImage(named: "placeholder") // default
 
-        ratingLabel.font = .systemFont(ofSize: 14)
-        ratingLabel.textColor = .systemBlue
+        titleLabel.font = UIFont.boldSystemFont(ofSize: 16)
+        titleLabel.numberOfLines = 2
 
-        posterImageView.contentMode = .scaleAspectFill
-        posterImageView.clipsToBounds = true
-        posterImageView.layer.cornerRadius = 8
-        posterImageView.isUserInteractionEnabled = true
-    }
+        yearLabel.font = UIFont.systemFont(ofSize: 14)
+        yearLabel.textColor = .darkGray
 
-    private func setupIdLabel() {
-        idLabel.font = .italicSystemFont(ofSize: 12)
-        idLabel.textColor = .gray
-        idLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(idLabel)
+        ratingLabel.font = UIFont.systemFont(ofSize: 14)
+        ratingLabel.textColor = .systemOrange
 
-        NSLayoutConstraint.activate([
-            idLabel.topAnchor.constraint(equalTo: filmTitleLabel.bottomAnchor, constant: 2),
-            idLabel.leadingAnchor.constraint(equalTo: filmTitleLabel.leadingAnchor)
-        ])
-    }
-
-    private func setupLikeButton() {
-        likeButton.setTitle("♡", for: .normal)
-        likeButton.titleLabel?.font = .systemFont(ofSize: 20)
-        likeButton.tintColor = .systemBlue
-        likeButton.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(likeButton)
-
+        likeButton.setImage(UIImage(systemName: "heart"), for: .normal)
+        likeButton.tintColor = .systemRed
         likeButton.addTarget(self, action: #selector(likeButtonTapped), for: .touchUpInside)
 
+        let labelsStack = UIStackView(arrangedSubviews: [titleLabel, yearLabel, ratingLabel])
+        labelsStack.axis = .vertical
+        labelsStack.spacing = 4
+
+        let mainStack = UIStackView(arrangedSubviews: [imageView, labelsStack, likeButton])
+        mainStack.axis = .vertical
+        mainStack.spacing = 8
+        mainStack.translatesAutoresizingMaskIntoConstraints = false
+
+        contentView.addSubview(mainStack)
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+
         NSLayoutConstraint.activate([
-            likeButton.centerYAnchor.constraint(equalTo: ratingLabel.centerYAnchor),
-            likeButton.leadingAnchor.constraint(equalTo: ratingLabel.trailingAnchor, constant: 20),
-            likeButton.widthAnchor.constraint(equalToConstant: 30),
-            likeButton.heightAnchor.constraint(equalToConstant: 30)
+            imageView.heightAnchor.constraint(equalTo: contentView.heightAnchor, multiplier: 0.6),
+
+            mainStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+            mainStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            mainStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            mainStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8)
         ])
     }
 
-    private func setupGesture() {
-        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap))
-        doubleTap.numberOfTapsRequired = 2
-        posterImageView.addGestureRecognizer(doubleTap)
-    }
-
-    @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
-        guard let item = currentItem,
-              let superview = posterImageView.superview else { return }
-
-        let startPoint = superview.convert(posterImageView.center, to: nil)
-        delegate?.didDoubleTapPoster(for: item, startPoint: startPoint)
-    }
-
-
     @objc private func likeButtonTapped() {
-        guard let item = currentItem else { return }
-        delegate?.didTapLikeButton(for: item)
+        delegate?.didTapLikeButton(on: self)
     }
 
-    func configure(with item: Item, isImageOnly: Bool) {
-        currentItem = item
-        
-        let image = UIImage(named: item.testPic ?? "") ?? UIImage(named: "placeholder")
-        posterImageView.image = image
+    func configure(with item: Item, imageBaseURL: String, posterSize: String) {
+        titleLabel.text = item.testTitle
+        yearLabel.text = item.testYeah
+        ratingLabel.text = item.testRating
 
-        filmTitleLabel.isHidden = isImageOnly
-        releaseYearLabel.isHidden = isImageOnly
-        ratingLabel.isHidden = isImageOnly
-        idLabel.isHidden = isImageOnly
-        likeButton.isHidden = isImageOnly
+        let isLiked = item.isLiked
+        likeButton.setImage(UIImage(systemName: isLiked ? "heart.fill" : "heart"), for: .normal)
 
-        if !isImageOnly {
-            filmTitleLabel.text = item.testTitle ?? "-"
-            releaseYearLabel.text = item.testYeah ?? "-"
-            ratingLabel.text = "⭐️ \(item.testRating ?? "-")"
-            idLabel.text = ""
-
-            let likeTitle = item.isLiked ? "♥" : "♡"
-            likeButton.setTitle(likeTitle, for: .normal)
-            likeButton.tintColor = item.isLiked ? .systemRed : .systemBlue
-        } else {
-            filmTitleLabel.text = nil
-            releaseYearLabel.text = nil
-            ratingLabel.text = nil
-            idLabel.text = nil
+        let path = item.testPic
+        guard !path.isEmpty else {
+            imageView.image = UIImage(named: "placeholder")
+            return
         }
+
+        // Формирование корректного URL для изображения
+        let baseURL = imageBaseURL.hasSuffix("/") ? imageBaseURL : imageBaseURL + "/"
+        let sizePath = posterSize.hasSuffix("/") ? String(posterSize.dropLast()) : posterSize
+        let fullPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
+
+        let fullURLString = baseURL + sizePath + "/" + fullPath
+        currentImageURL = fullURLString
+        print("📸 URL: \(fullURLString)")
+
+        if let cachedImage = MyCustomCell.imageCache.object(forKey: fullURLString as NSString) {
+            imageView.image = cachedImage
+            return
+        }
+
+        imageView.image = UIImage(named: "placeholder") // пока загружается
+
+        guard let url = URL(string: fullURLString) else {
+            print("❌ Невалидный URL: \(fullURLString)")
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+            guard let self = self,
+                  let data = data,
+                  let image = UIImage(data: data),
+                  self.currentImageURL == fullURLString else {
+                return
+            }
+
+            MyCustomCell.imageCache.setObject(image, forKey: fullURLString as NSString)
+            DispatchQueue.main.async {
+                self.imageView.image = image
+            }
+        }.resume()
     }
 }
