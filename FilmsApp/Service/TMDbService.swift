@@ -6,10 +6,12 @@ class TMDbService {
     
     private let bearerToken = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhYjM3NzZmMzU5ZmNlZjNiMjAzMDczNWNlZWEyZWVhZiIsIm5iZiI6MTc0MzUyNTMxNy4yMjQsInN1YiI6IjY3ZWMxNWM1ZTE2YzYxZGE0NDQyYjFkNSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.DMeofagrq7g5PKLJZxCre1RiVxScyuJcaDjIcGq8Mc8"
     
+    private let baseImageURL = "https://image.tmdb.org/t/p/w780"
+    
     private init() {}
     
-    func fetchPopularMovies() async throws -> [Item] {
-        guard let url = URL(string: "https://api.themoviedb.org/3/movie/popular?language=ru-RU&page=1") else {
+    func fetchPopularMovies(page: Int) async throws -> [Item] {
+        guard let url = URL(string: "https://api.themoviedb.org/3/movie/popular?language=ru-RU&page=\(page)") else {
             throw URLError(.badURL)
         }
         
@@ -27,24 +29,43 @@ class TMDbService {
         
         var items: [Item] = []
         
-        for movie in results {
+        for movieDict in results {
             let item = Item()
-            item.id = movie["id"] as? Int ?? 0
-            item.testTitle = (movie["title"] as? String) ?? ""
             
-            if let date = movie["release_date"] as? String, date.count >= 4 {
-                item.testYeah = String(date.prefix(4))
+            // id
+            item.id = movieDict["id"] as? Int ?? 0
+            
+            // название фильма (title или original_title)
+            if let title = movieDict["title"] as? String {
+                item.testTitle = title
+            } else if let originalTitle = movieDict["original_title"] as? String {
+                item.testTitle = originalTitle
             } else {
-                item.testYeah = ""
+                item.testTitle = "Без названия"
             }
             
-            if let rating = movie["vote_average"] as? Double {
-                item.testRating = String(format: "%.1f", rating)
+            // год выпуска (из release_date, формат "YYYY-MM-DD")
+            if let releaseDate = movieDict["release_date"] as? String, releaseDate.count >= 4 {
+                let year = String(releaseDate.prefix(4))
+                item.testYeah = year
             } else {
-                item.testRating = ""
+                item.testYeah = "Неизвестно"
             }
             
-            item.testPic = (movie["poster_path"] as? String) ?? ""
+            // рейтинг (vote_average)
+            if let voteAverage = movieDict["vote_average"] as? Double {
+                item.testRating = String(format: "%.1f", voteAverage)
+            } else {
+                item.testRating = "0.0"
+            }
+            
+            // формируем полный URL для картинки и сохраняем в testPic
+            if let posterPath = movieDict["poster_path"] as? String {
+                item.testPic = baseImageURL + posterPath
+            } else {
+                item.testPic = ""
+            }
+            
             items.append(item)
         }
         

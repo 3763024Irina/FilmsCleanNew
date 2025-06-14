@@ -9,9 +9,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
 
-        // Настройка конфигурации Realm с миграцией
+       
         let config = Realm.Configuration(
-            schemaVersion: 3, // Увеличь версию, если уже было 2 — поставь 3
+            schemaVersion: 3,
             migrationBlock: { migration, oldSchemaVersion in
                 if oldSchemaVersion < 3 {
                     migration.enumerateObjects(ofType: Item.className()) { oldObject, newObject in

@@ -3,20 +3,18 @@ import RealmSwift
 
 class ImageFullscreenViewController: UIViewController, UIScrollViewDelegate {
 
-    // Можно задать одно из этих значений:
-    var image: UIImage?          // Если картинка передана напрямую
-    var imageUrl: URL?           // Если картинка по URL
-    var itemId: Int?             // Для загрузки из Realm, если URL нужно формировать
+    // MARK: - Входные данные
+    var image: UIImage?
+    var imageUrl: URL?
+    var itemId: Int?
 
-    // Для формирования URL из itemId
     var imageBaseURL: String = "https://image.tmdb.org/t/p/"
-    var posterSize: String = "w500"
+    var posterSize: String = "w780"
 
     private let scrollView = UIScrollView()
     private let imageView = UIImageView()
-    private let realm = try! Realm()
 
-    // Кэш изображений (используем NSURL ключ, так безопаснее)
+    private let realm = try! Realm()
     static let imageCache = NSCache<NSURL, UIImage>()
 
     override func viewDidLoad() {
@@ -24,8 +22,14 @@ class ImageFullscreenViewController: UIViewController, UIScrollViewDelegate {
         view.backgroundColor = .black
 
         setupScrollView()
-        setupGesture()
+        setupGestureRecognizers()
         loadAndDisplayImage()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        updateZoomScale()
+        centerImage()
     }
 
     private func setupScrollView() {
@@ -34,15 +38,20 @@ class ImageFullscreenViewController: UIViewController, UIScrollViewDelegate {
         scrollView.delegate = self
         scrollView.minimumZoomScale = 1.0
         scrollView.maximumZoomScale = 4.0
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.bouncesZoom = true
+        scrollView.bounces = true
+        scrollView.alwaysBounceVertical = true
+        scrollView.alwaysBounceHorizontal = true
         view.addSubview(scrollView)
 
         imageView.contentMode = .scaleAspectFit
-        imageView.frame = scrollView.bounds
-        imageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        imageView.clipsToBounds = true
         scrollView.addSubview(imageView)
     }
 
-    private func setupGesture() {
+    private func setupGestureRecognizers() {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissSelf))
         view.addGestureRecognizer(tapGesture)
     }
@@ -52,75 +61,105 @@ class ImageFullscreenViewController: UIViewController, UIScrollViewDelegate {
     }
 
     private func loadAndDisplayImage() {
-        // 1. Если есть image напрямую — сразу показываем
-        if let directImage = image {
-            imageView.image = directImage
+        if let img = image {
+            setImage(img)
             return
         }
 
-        // 2. Если есть URL — грузим по нему с кешем
         if let url = imageUrl {
             if let cached = Self.imageCache.object(forKey: url as NSURL) {
-                imageView.image = cached
-                return
-            }
-            loadImage(from: url)
-            return
-        }
-
-        // 3. Если есть itemId — пытаемся сформировать URL из Realm и загрузить
-        if let id = itemId,
-           let item = realm.object(ofType: Item.self, forPrimaryKey: id),
-           !item.testPic.isEmpty {  // заменили if let на проверку пустой строки
-
-            // Формируем полный URL
-            let baseURL = imageBaseURL.hasSuffix("/") ? imageBaseURL : imageBaseURL + "/"
-            let sanitizedSize = posterSize.hasSuffix("/") ? String(posterSize.dropLast()) : posterSize
-            let cleanedPath = item.testPic.hasPrefix("/") ? String(item.testPic.dropFirst()) : item.testPic
-            let urlString = baseURL + sanitizedSize + "/" + cleanedPath
-
-            guard let url = URL(string: urlString) else {
-                imageView.image = UIImage(named: "placeholder")
-                return
-            }
-
-            if let cached = Self.imageCache.object(forKey: url as NSURL) {
-                imageView.image = cached
+                setImage(cached)
             } else {
                 loadImage(from: url)
             }
             return
         }
 
-        // 4. Если ничего нет — плейсхолдер
-        imageView.image = UIImage(named: "placeholder")
+        if let id = itemId,
+           let item = realm.object(ofType: Item.self, forPrimaryKey: id),
+           !item.testPic.isEmpty {
+
+            let base = imageBaseURL.hasSuffix("/") ? imageBaseURL : imageBaseURL + "/"
+            let size = posterSize.hasSuffix("/") ? String(posterSize.dropLast()) : posterSize
+            let path = item.testPic.hasPrefix("/") ? String(item.testPic.dropFirst()) : item.testPic
+            let urlString = base + size + "/" + path
+
+            guard let url = URL(string: urlString) else {
+                setImage(UIImage(named: "placeholder"))
+                return
+            }
+
+            if let cached = Self.imageCache.object(forKey: url as NSURL) {
+                setImage(cached)
+            } else {
+                loadImage(from: url)
+            }
+            return
+        }
+
+        setImage(UIImage(named: "placeholder"))
     }
 
     private func loadImage(from url: URL) {
         imageView.image = UIImage(named: "placeholder")
-        print("📸 Загрузка изображения: \(url.absoluteString)")
 
         URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
             guard let self = self,
                   let data = data,
+                  error == nil,
                   let downloadedImage = UIImage(data: data) else {
                 DispatchQueue.main.async {
-                    self?.imageView.image = UIImage(named: "placeholder")
+                    self?.setImage(UIImage(named: "placeholder"))
                 }
                 return
             }
 
             Self.imageCache.setObject(downloadedImage, forKey: url as NSURL)
-
             DispatchQueue.main.async {
-                self.imageView.image = downloadedImage
+                self.setImage(downloadedImage)
             }
         }.resume()
     }
 
-    // MARK: - UIScrollViewDelegate
+    private func setImage(_ image: UIImage?) {
+        guard let img = image else { return }
 
+        imageView.image = img
+        imageView.frame = CGRect(origin: .zero, size: img.size)
+        scrollView.contentSize = img.size
+
+        updateZoomScale()
+        centerImage()
+    }
+
+    private func updateZoomScale() {
+        guard let image = imageView.image else { return }
+
+        let widthScale = scrollView.bounds.width / image.size.width
+        let heightScale = scrollView.bounds.height / image.size.height
+        let minScale = min(widthScale, heightScale)
+
+        scrollView.minimumZoomScale = minScale
+        scrollView.zoomScale = minScale
+    }
+
+    private func centerImage() {
+        let imageViewSize = imageView.frame.size
+        let scrollViewSize = scrollView.bounds.size
+
+        let horizontalInset = max(0, (scrollViewSize.width - imageViewSize.width) / 2)
+        let verticalInset = max(0, (scrollViewSize.height - imageViewSize.height) / 2)
+
+        scrollView.contentInset = UIEdgeInsets(top: verticalInset, left: horizontalInset,
+                                               bottom: verticalInset, right: horizontalInset)
+    }
+
+    // MARK: - UIScrollViewDelegate
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         return imageView
+    }
+
+    func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        centerImage()
     }
 }

@@ -2,6 +2,9 @@ import UIKit
 import RealmSwift
 
 class MainViewController: UIViewController {
+    private var currentPage = 1
+    private var isLoading = false
+    private var hasMorePages = true
 
     private var realm: Realm!
     private var notificationToken: NotificationToken?
@@ -11,26 +14,28 @@ class MainViewController: UIViewController {
 
     private var collectionView: UICollectionView!
     private var searchBar: UISearchBar!
+    private var activityIndicator: UIActivityIndicatorView!
 
     private var imageBaseURL: String = ""
-    private var posterSize: String = "w500"
+    private var posterSize: String = "w780"
 
     private var showingLikedOnly = false
 
-    private let apiKey = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhYjM3NzZmMzU5ZmNlZjNiMjAzMDczNWNlZWEyZWVhZiIsIm5iZiI6MTc0MzUyNTMxNy4yMjQsInN1YiI6IjY3ZWMxNWM1ZTE2YzYxZGE0NDQyYjFkNSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.DMeofagrq7g5PKLJZxCre1RiVxScyuJcaDjIcGq8Mc8" 
+    private let apiKey = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhYjM3NzZmMzU5ZmNlZjNiMjAzMDczNWNlZWEyZWVhZiIsIm5iZiI6MTc0MzUyNTMxNy4yMjQsInN1YiI6IjY3ZWMxNWM1ZTE2YzYxZGE0NDQyYjFkNSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.DMeofagrq7g5PKLJZxCre1RiVxScyuJcaDjIcGq8Mc8"
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
-
+        
         setupRealm()
         setupSearchBar()
         setupCollectionView()
         setupNavigationBar()
+        setupActivityIndicator()
 
         testArray = realm.objects(Item.self).sorted(byKeyPath: "id", ascending: true)
         filteredArray = testArray
-
+        
         notificationToken = testArray.observe { [weak self] changes in
             guard let self = self else { return }
             switch changes {
@@ -43,13 +48,13 @@ class MainViewController: UIViewController {
                     self.collectionView.reloadItems(at: modifications.map { IndexPath(item: $0, section: 0) })
                 }
             case .error(let error):
-                fatalError("\(error)")
+                self.showErrorAlert(message: "Realm notification error: \(error.localizedDescription)")
             }
         }
-
+        
         Task {
             await fetchTMDbConfiguration()
-            await loadMoviesFromAPIIfNeeded()
+            await fetchPopularMovies(page: currentPage)
         }
     }
 
@@ -57,7 +62,9 @@ class MainViewController: UIViewController {
         let config = Realm.Configuration(
             schemaVersion: 3,
             migrationBlock: { migration, oldSchemaVersion in
-                if oldSchemaVersion < 3 { }
+                if oldSchemaVersion < 3 {
+                    // Миграции при необходимости
+                }
             },
             deleteRealmIfMigrationNeeded: true
         )
@@ -82,22 +89,30 @@ class MainViewController: UIViewController {
         navigationItem.rightBarButtonItem = heartButton
     }
 
+    private func setupActivityIndicator() {
+        activityIndicator = UIActivityIndicatorView(style: .medium)
+        activityIndicator.hidesWhenStopped = true
+        navigationItem.leftBarButtonItem = UIBarButtonItem(customView: activityIndicator)
+    }
+
     @objc func showLikedMovies() {
         showingLikedOnly.toggle()
         updateFilteredArray()
     }
 
     private func updateFilteredArray() {
-        if let text = searchBar.text, !text.isEmpty {
-            if showingLikedOnly {
-                filteredArray = testArray.filter("isLiked == true AND testTitle CONTAINS[c] %@", text)
+        DispatchQueue.main.async {
+            if let text = self.searchBar.text, !text.isEmpty {
+                if self.showingLikedOnly {
+                    self.filteredArray = self.testArray.filter("isLiked == true AND testTitle CONTAINS[c] %@", text)
+                } else {
+                    self.filteredArray = self.testArray.filter("testTitle CONTAINS[c] %@", text)
+                }
             } else {
-                filteredArray = testArray.filter("testTitle CONTAINS[c] %@", text)
+                self.filteredArray = self.showingLikedOnly ? self.testArray.filter("isLiked == true") : self.testArray
             }
-        } else {
-            filteredArray = showingLikedOnly ? testArray.filter("isLiked == true") : testArray
+            self.collectionView.reloadData()
         }
-        collectionView.reloadData()
     }
 
     private func setupSearchBar() {
@@ -120,7 +135,22 @@ class MainViewController: UIViewController {
         collectionView.delegate = self
         collectionView.register(MyCustomCell.self, forCellWithReuseIdentifier: "MyCustomCell")
 
+        let refreshControl = UIRefreshControl()
+        refreshControl.addTarget(self, action: #selector(refreshMovies), for: .valueChanged)
+        collectionView.refreshControl = refreshControl
+
         view.addSubview(collectionView)
+    }
+
+    @objc private func refreshMovies() {
+        currentPage = 1
+        hasMorePages = true
+        Task {
+            await fetchPopularMovies(page: currentPage)
+            DispatchQueue.main.async {
+                self.collectionView.refreshControl?.endRefreshing()
+            }
+        }
     }
 
     private func fetchTMDbConfiguration() async {
@@ -136,27 +166,33 @@ class MainViewController: UIViewController {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
         do {
+            DispatchQueue.main.async { self.activityIndicator.startAnimating() }
+
             let (data, _) = try await URLSession.shared.data(for: request)
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let images = json["images"] as? [String: Any],
                let baseURL = images["secure_base_url"] as? String,
                let posterSizes = images["poster_sizes"] as? [String] {
                 imageBaseURL = baseURL
-                posterSize = posterSizes.contains("w500") ? "w500" : posterSizes.last ?? "w342"
+                posterSize = posterSizes.contains("w780") ? "w780" : posterSizes.last ?? "w342"
             }
         } catch {
-            print("Ошибка конфигурации TMDb:", error)
+            showErrorAlert(message: "Ошибка конфигурации TMDb: \(error.localizedDescription)")
         }
+
+        DispatchQueue.main.async { self.activityIndicator.stopAnimating() }
     }
 
-    private func loadMoviesFromAPIIfNeeded() async {
-        if realm.objects(Item.self).isEmpty {
-            await fetchPopularMovies()
-        }
-    }
+    private func fetchPopularMovies(page: Int = 1) async {
+        guard !isLoading, hasMorePages else { return }
+        isLoading = true
+        DispatchQueue.main.async { self.activityIndicator.startAnimating() }
 
-    private func fetchPopularMovies() async {
-        guard let url = URL(string: "https://api.themoviedb.org/3/movie/popular?language=ru-RU&page=1") else { return }
+        guard let url = URL(string: "https://api.themoviedb.org/3/movie/popular?language=ru-RU&page=\(page)") else {
+            isLoading = false
+            DispatchQueue.main.async { self.activityIndicator.stopAnimating() }
+            return
+        }
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -167,36 +203,46 @@ class MainViewController: UIViewController {
             let (data, _) = try await URLSession.shared.data(for: request)
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let results = json["results"] as? [[String: Any]] {
-                try realm.write {
-                    for movie in results {
-                        let item = Item()
-                        item.id = movie["id"] as? Int ?? 0
-                        item.testTitle = (movie["title"] as? String) ?? ""
-                        
-                        if let date = movie["release_date"] as? String, date.count >= 4 {
-                            item.testYeah = String(date.prefix(4))
-                        } else {
-                            item.testYeah = ""
-                        }
 
-                        if let rating = movie["vote_average"] as? Double {
-                            item.testRating = String(format: "%.1f", rating)
-                        } else {
-                            item.testRating = ""
+                if results.isEmpty {
+                    hasMorePages = false
+                } else {
+                    try realm.write {
+                        if page == 1 {
+                            realm.delete(realm.objects(Item.self))
                         }
-
-                        item.testPic = (movie["poster_path"] as? String) ?? ""
-                        realm.add(item, update: .modified)
+                        for movie in results {
+                            let id = movie["id"] as? Int ?? 0
+                            if let existing = realm.object(ofType: Item.self, forPrimaryKey: id) {
+                                existing.update(from: movie)
+                            } else {
+                                let item = Item()
+                                item.id = id
+                                item.testTitle = (movie["title"] as? String) ?? ""
+                                if let date = movie["release_date"] as? String, date.count >= 4 {
+                                    item.testYeah = String(date.prefix(4))
+                                } else {
+                                    item.testYeah = ""
+                                }
+                                if let rating = movie["vote_average"] as? Double {
+                                    item.testRating = String(format: "%.1f", rating)
+                                } else {
+                                    item.testRating = ""
+                                }
+                                item.testPic = (movie["poster_path"] as? String) ?? ""
+                                realm.add(item, update: .modified)
+                            }
+                        }
                     }
+                    currentPage += 1
                 }
-
-                DispatchQueue.main.async {
-                    self.updateFilteredArray()
-                }
+                updateFilteredArray()
             }
         } catch {
-            print("Ошибка загрузки фильмов:", error)
+            showErrorAlert(message: "Ошибка загрузки фильмов: \(error.localizedDescription)")
         }
+        isLoading = false
+        DispatchQueue.main.async { self.activityIndicator.stopAnimating() }
     }
 
     private func searchMovies(query: String) async {
@@ -211,47 +257,69 @@ class MainViewController: UIViewController {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
         do {
+            DispatchQueue.main.async { self.activityIndicator.startAnimating() }
+
             let (data, _) = try await URLSession.shared.data(for: request)
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let results = json["results"] as? [[String: Any]] {
                 try realm.write {
                     for movie in results {
-                        let item = Item()
-                        item.id = movie["id"] as? Int ?? 0
-                        item.testTitle = (movie["title"] as? String) ?? ""
-                        
-                        if let date = movie["release_date"] as? String, date.count >= 4 {
-                            item.testYeah = String(date.prefix(4))
+                        let id = movie["id"] as? Int ?? 0
+                        if let existing = realm.object(ofType: Item.self, forPrimaryKey: id) {
+                            existing.update(from: movie)
                         } else {
-                            item.testYeah = ""
+                            let item = Item()
+                            item.id = id
+                            item.testTitle = (movie["title"] as? String) ?? ""
+                            if let date = movie["release_date"] as? String, date.count >= 4 {
+                                item.testYeah = String(date.prefix(4))
+                            } else {
+                                item.testYeah = ""
+                            }
+                            if let rating = movie["vote_average"] as? Double {
+                                item.testRating = String(format: "%.1f", rating)
+                            } else {
+                                item.testRating = ""
+                            }
+                            item.testPic = (movie["poster_path"] as? String) ?? ""
+                            realm.add(item, update: .modified)
                         }
-
-                        if let rating = movie["vote_average"] as? Double {
-                            item.testRating = String(format: "%.1f", rating)
-                        } else {
-                            item.testRating = ""
-                        }
-
-                        item.testPic = (movie["poster_path"] as? String) ?? ""
-                        realm.add(item, update: .modified)
                     }
                 }
-                DispatchQueue.main.async {
-                    self.updateFilteredArray()
-                }
+                updateFilteredArray()
             }
         } catch {
-            print("Ошибка поиска фильмов:", error)
+            showErrorAlert(message: "Ошибка поиска фильмов: \(error.localizedDescription)")
         }
+        DispatchQueue.main.async { self.activityIndicator.stopAnimating() }
     }
 
+    private func showErrorAlert(message: String) {
+        DispatchQueue.main.async {
+            let alert = UIAlertController(title: "Ошибка", message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "ОК", style: .default))
+            self.present(alert, animated: true)
+        }
+    }
 }
 
 // MARK: - UICollectionView
 
 extension MainViewController: UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return filteredArray.count
+        filteredArray.count
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        let offsetY = scrollView.contentOffset.y
+        let contentHeight = scrollView.contentSize.height
+        let frameHeight = scrollView.frame.size.height
+        
+        if offsetY > contentHeight - frameHeight * 1.5 {
+            Task {
+                await fetchPopularMovies(page: currentPage)
+            }
+        }
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -302,7 +370,32 @@ extension MainViewController: MyCustomCellDelegate {
             }
             updateFilteredArray()
         } catch {
-            print("Ошибка при обновлении isLiked:", error)
+            showErrorAlert(message: "Ошибка при обновлении isLiked: \(error.localizedDescription)")
+        }
+    }
+
+    func didTapCell(_ cell: MyCustomCell) {
+        guard let indexPath = collectionView.indexPath(for: cell) else { return }
+        let selectedFilm = filteredArray[indexPath.item]
+
+        let storyboard = UIStoryboard(name: "Main", bundle: nil)
+        if let detailVC = storyboard.instantiateViewController(withIdentifier: "DetailFilmViewController") as? DetailFilmViewController {
+            detailVC.film = selectedFilm
+            detailVC.delegate = self
+            navigationController?.pushViewController(detailVC, animated: true)
+        }
+    }
+}
+
+// MARK: - DetailFilmViewControllerDelegate
+
+extension MainViewController: DetailFilmViewControllerDelegate {
+    func didUpdateFilm(_ film: Item) {
+        for (index, item) in filteredArray.enumerated() {
+            if item.id == film.id {
+                collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
+                break
+            }
         }
     }
 }

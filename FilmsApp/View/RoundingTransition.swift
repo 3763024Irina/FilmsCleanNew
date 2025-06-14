@@ -1,22 +1,36 @@
 import UIKit
 
 class RoundingTransition: NSObject, UIViewControllerAnimatedTransitioning {
-
+    
     enum TransitionProfile {
-        case show
-        case pop
+        case show, pop
     }
-
+    
     var transitionProfile: TransitionProfile = .show
     var start: CGPoint = .zero
     var duration: TimeInterval = 0.4
-
     private let animationScale: CGFloat = 0.05
-
-    func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
-        return duration
+    private let dimmingViewTag = 999
+    
+    var onCompleted: (() -> Void)?
+    var onDismissed: (() -> Void)?
+    
+    private var smallScale: CGAffineTransform {
+        CGAffineTransform(scaleX: animationScale, y: animationScale)
     }
-
+    
+    private var dimmingColor: UIColor {
+        if UITraitCollection.current.userInterfaceStyle == .dark {
+            return UIColor(white: 0, alpha: 0.8) // чуть светлее в темной теме
+        } else {
+            return UIColor(white: 0, alpha: 0.5)
+        }
+    }
+    
+    func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
+        duration
+    }
+    
     func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
         switch transitionProfile {
         case .show:
@@ -25,50 +39,68 @@ class RoundingTransition: NSObject, UIViewControllerAnimatedTransitioning {
             animatePop(using: transitionContext)
         }
     }
-
+    
     private func animateShow(using transitionContext: UIViewControllerContextTransitioning) {
-        guard let toVC = transitionContext.viewController(forKey: .to) else { return }
-
+        guard let toView = transitionContext.view(forKey: .to),
+              let toVC = transitionContext.viewController(forKey: .to) else {
+            transitionContext.completeTransition(false)
+            return
+        }
+        
         let containerView = transitionContext.containerView
         let finalFrame = transitionContext.finalFrame(for: toVC)
-
+        
         let dimmingView = UIView(frame: containerView.bounds)
-        dimmingView.backgroundColor = .black
+        dimmingView.backgroundColor = dimmingColor
         dimmingView.alpha = 0
-        dimmingView.tag = 999  // чтобы потом можно было удалить
-
-        toVC.view.frame = finalFrame
-        toVC.view.center = start
-        toVC.view.transform = CGAffineTransform(scaleX: animationScale, y: animationScale)
-        toVC.view.alpha = 0
-
+        dimmingView.tag = dimmingViewTag
+        dimmingView.isAccessibilityElement = false
+        
+        toView.frame = finalFrame
+        toView.center = start
+        toView.transform = smallScale
+        toView.alpha = 0
+        
         containerView.addSubview(dimmingView)
-        containerView.addSubview(toVC.view)
-
-        UIView.animate(withDuration: duration, delay: 0, options: [.curveEaseInOut], animations: {
+        containerView.addSubview(toView)
+        
+        // Плавная анимация с UIViewPropertyAnimator для более плавного эффекта
+        let animator = UIViewPropertyAnimator(duration: duration, curve: .easeInOut) {
             dimmingView.alpha = 1
-            toVC.view.center = containerView.center
-            toVC.view.transform = .identity
-            toVC.view.alpha = 1
-        }, completion: { finished in
+            toView.center = containerView.center
+            toView.transform = .identity
+            toView.alpha = 1
+        }
+        animator.addCompletion { [weak self] position in
+            let finished = position == .end
             transitionContext.completeTransition(finished)
-        })
+            if finished {
+                self?.onCompleted?()
+            }
+        }
+        animator.startAnimation()
     }
-
+    
     private func animatePop(using transitionContext: UIViewControllerContextTransitioning) {
-        guard let fromVC = transitionContext.viewController(forKey: .from) else { return }
-
+        guard let fromView = transitionContext.view(forKey: .from) else {
+            transitionContext.completeTransition(false)
+            return
+        }
+        
         let containerView = transitionContext.containerView
-        let dimmingView = containerView.viewWithTag(999)
-
+        let dimmingView = containerView.viewWithTag(dimmingViewTag)
+        
         UIView.animate(withDuration: duration, delay: 0, options: [.curveEaseInOut], animations: {
-            fromVC.view.center = self.start
-            fromVC.view.transform = CGAffineTransform(scaleX: self.animationScale, y: self.animationScale)
-            fromVC.view.alpha = 0
+            fromView.center = self.start
+            fromView.transform = self.smallScale
+            fromView.alpha = 0
             dimmingView?.alpha = 0
-        }, completion: { finished in
-            dimmingView?.removeFromSuperview()
-            fromVC.view.removeFromSuperview()
+        }, completion: { [weak self] finished in
+            if finished {
+                dimmingView?.removeFromSuperview()
+                fromView.removeFromSuperview()
+                self?.onDismissed?()
+            }
             transitionContext.completeTransition(finished)
         })
     }
