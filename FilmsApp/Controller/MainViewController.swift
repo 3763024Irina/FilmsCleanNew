@@ -246,51 +246,49 @@ class MainViewController: UIViewController, MyCustomCellDelegate {
 
         let urlString = "https://api.themoviedb.org/3/movie/\(category.title)?language=ru-RU&page=\(page)&api_key=\(apiKey)"
 
-        guard let url = URL(string: urlString) else {
-            isLoading = false
-            DispatchQueue.main.async { self.activityIndicator.stopAnimating() }
-            return
-        }
+        NetworkManager.shared.dataRequest(urlString: urlString) { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .success(let data):
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let results = json["results"] as? [[String: Any]] {
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "accept")
-
-        do {
-            let (data, _) = try await URLSession.shared.data(for: request)
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let results = json["results"] as? [[String: Any]] {
-
-                if results.isEmpty {
-                    hasMorePages = false
-                } else {
-                    try realm.write {
-                        if page == 1 {
-                            realm.delete(realm.objects(Item.self))
-                        }
-                        for movie in results {
-                            let id = movie["id"] as? Int ?? 0
-                            if let existing = realm.object(ofType: Item.self, forPrimaryKey: id) {
-                                existing.update(from: movie)
-                            } else {
-                                let item = Item()
-                                item.id = id
-                                item.update(from: movie)
-                                realm.add(item, update: .modified)
+                        if results.isEmpty {
+                            self.hasMorePages = false
+                        } else {
+                            try self.realm.write {
+                                if page == 1 {
+                                    self.realm.delete(self.realm.objects(Item.self))
+                                }
+                                for movie in results {
+                                    let id = movie["id"] as? Int ?? 0
+                                    if let existing = self.realm.object(ofType: Item.self, forPrimaryKey: id) {
+                                        existing.update(from: movie)
+                                    } else {
+                                        let item = Item()
+                                        item.id = id
+                                        item.update(from: movie)
+                                        self.realm.add(item, update: .modified)
+                                    }
+                                }
                             }
+                            self.currentPage += 1
                         }
+                        self.updateFilteredItems()
                     }
-                    currentPage += 1
+                } catch {
+                    self.showErrorAlert(message: "Ошибка парсинга фильмов: \(error.localizedDescription)")
                 }
-                updateFilteredItems()
+            case .failure(let error):
+                self.showErrorAlert(message: "Ошибка загрузки фильмов: \(error.localizedDescription)")
             }
-        } catch {
-            showErrorAlert(message: "Ошибка загрузки фильмов: \(error.localizedDescription)")
-        }
 
-        isLoading = false
-        DispatchQueue.main.async { self.activityIndicator.stopAnimating() }
+            self.isLoading = false
+            DispatchQueue.main.async { self.activityIndicator.stopAnimating() }
+        }
     }
+
 
     // MARK: - Alerts
 
