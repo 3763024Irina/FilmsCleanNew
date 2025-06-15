@@ -1,9 +1,3 @@
-//
-//  enum MovieCategory.swift
-//  FilmsApp
-//
-//  Created by Irina on 15/6/25.
-//
 import Foundation
 
 enum MovieCategory: Int, CaseIterable {
@@ -20,16 +14,27 @@ enum MovieCategory: Int, CaseIterable {
         return "ru-RU"
     }
 
-    var urlString: String {
+    // Генерация URL с использованием URLComponents
+    func urlString(page: Int = 1) -> String {
         let base = "https://api.themoviedb.org/3/movie/"
         let endpoint: String
+        
         switch self {
         case .popular: endpoint = "popular"
         case .nowPlaying: endpoint = "now_playing"
         case .topRated: endpoint = "top_rated"
         case .upcoming: endpoint = "upcoming"
         }
-        return "\(base)\(endpoint)?api_key=\(apiKey)&language=\(language)&page=1"
+        
+        // Создаем URL с параметрами
+        var components = URLComponents(string: base + endpoint)
+        components?.queryItems = [
+            URLQueryItem(name: "api_key", value: apiKey),
+            URLQueryItem(name: "language", value: language),
+            URLQueryItem(name: "page", value: "\(page)")
+        ]
+        
+        return components?.url?.absoluteString ?? ""
     }
 
     var title: String {

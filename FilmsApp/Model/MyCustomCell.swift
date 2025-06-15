@@ -9,6 +9,47 @@ protocol MyCustomCellDelegate: AnyObject {
 class MyCustomCell: UICollectionViewCell {
     
     // MARK: - UI Elements
+    func configure(with item: Item) {
+        titleLabel.text = item.testTitle.isEmpty ? "Без названия" : item.testTitle
+        yearLabel.text = item.testYeah.isEmpty ? "Год неизвестен" : item.testYeah
+        
+        if let rating = Double(item.testRating), rating > 0 {
+            ratingLabel.text = "⭐️ \(item.testRating)"
+            ratingLabel.textColor = rating >= 7 ? .systemGreen : .systemOrange
+        } else {
+            ratingLabel.text = "Нет рейтинга"
+            ratingLabel.textColor = .secondaryLabel
+        }
+
+        likeButton.setImage(
+            UIImage(systemName: item.isLiked ? "heart.fill" : "heart"),
+            for: .normal
+        )
+
+        let path = item.testPic.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !path.isEmpty else {
+            imageView.image = UIImage(named: "placeholder")
+            currentImageURL = nil
+            return
+        }
+
+        currentImageURL = path
+        imageView.image = UIImage(named: "placeholder")
+
+        ImageLoader.shared.loadImage(from: path) { [weak self] image, _ in
+            guard let self = self, self.currentImageURL == path else { return }
+            if let image = image {
+                UIView.transition(with: self.imageView,
+                                  duration: 0.3,
+                                  options: .transitionCrossDissolve,
+                                  animations: {
+                    self.imageView.image = image
+                })
+            }
+        }
+    }
+
+
     
     private let imageView: UIImageView = {
         let iv = UIImageView()

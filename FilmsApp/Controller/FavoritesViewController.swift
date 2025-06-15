@@ -5,11 +5,15 @@ class FavoritesViewController: UIViewController {
 
     private var collectionView: UICollectionView!
     private var favoriteItems: [Item] = []
+    private var favoriteResults: Results<Item>?
+    private var notificationToken: NotificationToken?
+
     private let realm: Realm = {
         let config = Realm.Configuration(
             schemaVersion: 3,
             migrationBlock: { migration, oldSchemaVersion in
                 if oldSchemaVersion < 3 {
+                    // миграции если нужны
                 }
             }
         )
@@ -30,7 +34,11 @@ class FavoritesViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        loadFavorites()
+        // Не нужно вызывать loadFavorites здесь — теперь обновления идут через Realm наблюдатель
+    }
+
+    deinit {
+        notificationToken?.invalidate()
     }
 
     private func setupUI() {
@@ -61,9 +69,25 @@ class FavoritesViewController: UIViewController {
     }
 
     private func loadFavorites() {
-        let results = realm.objects(Item.self).filter("isLiked == true")
-        favoriteItems = Array(results)
-        collectionView.reloadData()
+        favoriteResults = realm.objects(Item.self).filter("isLiked == true")
+        
+        // Отменяем старый наблюдатель (если был)
+        notificationToken?.invalidate()
+        
+        // Добавляем новый наблюдатель на результаты Realm
+        notificationToken = favoriteResults?.observe { [weak self] changes in
+            guard let self = self else { return }
+            switch changes {
+            case .initial(let collection):
+                self.favoriteItems = Array(collection)
+                self.collectionView.reloadData()
+            case .update(let collection, _, _, _):
+                self.favoriteItems = Array(collection)
+                self.collectionView.reloadData()
+            case .error(let error):
+                print("❌ Ошибка Realm: \(error)")
+            }
+        }
     }
 }
 
@@ -107,8 +131,7 @@ extension FavoritesViewController: MyCustomCellDelegate {
         } catch {
             print("❌ Ошибка при сохранении лайка: \(error)")
         }
-        
-        loadFavorites()
+        // Здесь не нужно вызывать loadFavorites — обновление произойдёт автоматически
     }
 
     func didTapCell(_ cell: MyCustomCell) {

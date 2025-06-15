@@ -82,9 +82,18 @@ extension FullImageGalleryViewController: UICollectionViewDataSource, UICollecti
 
         let path = imagePaths[indexPath.item]
         cell.imageView.image = nil  // сбросим картинку пока идёт загрузка
+        cell.activityIndicator.startAnimating() // Показываем индикатор загрузки
 
-        ImageLoader.shared.loadImage(from: path) { image in
-            cell.imageView.image = image
+        ImageLoader.shared.loadImage(from: path) { image, error in
+            DispatchQueue.main.async {
+                if let image = image {
+                    cell.imageView.image = image
+                } else {
+                    // Если произошла ошибка, показываем placeholder
+                    cell.imageView.image = UIImage(named: "placeholder") // Или используйте стандартное изображение
+                }
+                cell.activityIndicator.stopAnimating() // Скрываем индикатор загрузки
+            }
         }
 
         return cell
@@ -138,14 +147,26 @@ class ImageCell: UICollectionViewCell {
         return iv
     }()
 
+    let activityIndicator: UIActivityIndicatorView = {
+        let ai = UIActivityIndicatorView(style: .large)
+        ai.translatesAutoresizingMaskIntoConstraints = false
+        ai.hidesWhenStopped = true
+        return ai
+    }()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         contentView.addSubview(imageView)
+        contentView.addSubview(activityIndicator)
+        
         NSLayoutConstraint.activate([
             imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+            imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            
+            activityIndicator.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: contentView.centerYAnchor)
         ])
     }
 

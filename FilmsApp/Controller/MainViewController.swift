@@ -401,3 +401,17 @@ extension MainViewController: UISearchBarDelegate {
         updateFilteredItems()
     }
 }
+extension MainViewController: UIScrollViewDelegate {
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        let offsetY = scrollView.contentOffset.y
+        let contentHeight = scrollView.contentSize.height
+        let frameHeight = scrollView.frame.size.height
+
+        if offsetY > contentHeight - frameHeight * 1.5 {
+            Task {
+                await loadMovies(category: selectedCategory, page: currentPage)
+            }
+        }
+    }
+}
+

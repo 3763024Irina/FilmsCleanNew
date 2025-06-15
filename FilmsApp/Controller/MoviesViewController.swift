@@ -9,21 +9,21 @@ import Foundation
 import UIKit
 
 class MoviesViewController: UIViewController {
-
+    
     private var movies: [[String: Any]] = []
     private let api = TMDbAPI()
-
+    
     private let tableView = UITableView()
-
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Фильмы Сейчас в кино"
         view.backgroundColor = .white
-
+        
         setupTableView()
         loadNowPlaying()
     }
-
+    
     private func setupTableView() {
         view.addSubview(tableView)
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -33,20 +33,25 @@ class MoviesViewController: UIViewController {
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
-
+        
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "cell")
     }
-
+    
     private func loadNowPlaying() {
         api.fetchNowPlaying { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let json):
+                    // Логируем весь полученный JSON, чтобы увидеть его структуру
+                    print("Загруженные данные: \(json)")
                     if let results = json["results"] as? [[String: Any]] {
+                        print("Загружено фильмов: \(results.count)")
                         self?.movies = results
                         self?.tableView.reloadData()
+                    } else {
+                        print("❌ Невозможно извлечь ключ 'results' из ответа: \(json)")
                     }
                 case .failure(let error):
                     print("Ошибка загрузки: \(error.localizedDescription)")
@@ -59,8 +64,10 @@ class MoviesViewController: UIViewController {
 extension MoviesViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        print("Количество фильмов: \(movies.count)")
         return movies.count
     }
+
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
