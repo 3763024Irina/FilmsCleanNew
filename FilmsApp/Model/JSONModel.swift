@@ -1,5 +1,6 @@
 import UIKit
 import RealmSwift
+
 class Item: Object {
     @objc dynamic var id = 0
     @objc dynamic var testTitle = ""
@@ -31,5 +32,10 @@ class Item: Object {
         if let overview = dict["overview"] as? String {
             testDescription = overview
         }
+    }
+    
+    // Метод для получения полного описания фильма
+    func getFullDescription() -> String {
+        return "\(testTitle)\nРейтинг: \(testRating)\nГод выпуска: \(testYeah)\nОписание: \(testDescription)"
     }
 }

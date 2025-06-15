@@ -1,69 +1,85 @@
 import Foundation
-import RealmSwift
 
-class TMDbService {
-    static let shared = TMDbService()
-    
-    private let bearerToken = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhYjM3NzZmMzU5ZmNlZjNiMjAzMDczNWNlZWEyZWVhZiIsIm5iZiI6MTc0MzUyNTMxNy4yMjQsInN1YiI6IjY3ZWMxNWM1ZTE2YzYxZGE0NDQyYjFkNSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.DMeofagrq7g5PKLJZxCre1RiVxScyuJcaDjIcGq8Mc8"
-    
-    private let baseImageURL = "https://image.tmdb.org/t/p/w780"
-    
-    private init() {}
-    
-    func fetchPopularMovies(page: Int) async throws -> [Item] {
-        guard let url = URL(string: "https://api.themoviedb.org/3/movie/popular?language=ru-RU&page=\(page)") else {
-            throw URLError(.badURL)
+// Класс для запросов к TMDb API
+class TMDbAPI {
+    // Вставь сюда свой API ключ (лучше хранить отдельно и безопасно)
+    private let apiKey = "ВАШ_API_КЛЮЧ"
+
+    // Базовый URL для запросов фильмов
+    private let baseURL = "https://api.themoviedb.org/3/movie"
+
+    // Универсальный метод для запросов с конечной точкой (endpoint)
+    func dataRequest(endpoint: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        let urlString = "\(baseURL)/\(endpoint)?api_key=\(apiKey)&language=ru-RU&page=1"
+        guard let url = URL(string: urlString) else {
+            completion(.failure(NSError(domain: "URL Error", code: 0)))
+            return
         }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "accept")
-        request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
-        
-        let (data, _) = try await URLSession.shared.data(for: request)
-        
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let results = json["results"] as? [[String: Any]] else {
-            throw NSError(domain: "ParsingError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON structure"])
+
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            guard let data = data else {
+                completion(.failure(NSError(domain: "Data Error", code: 0)))
+                return
+            }
+
+            do {
+                // Парсим JSON в словарь
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    completion(.success(json))
+                } else {
+                    completion(.failure(NSError(domain: "Parsing Error", code: 0)))
+                }
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
+
+    // Специальный метод для получения последнего фильма
+    func fetchLatest(completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        // У latest особый формат URL без пагинации
+        let urlString = "\(baseURL)/latest?api_key=\(apiKey)&language=ru-RU"
+        guard let url = URL(string: urlString) else {
+            completion(.failure(NSError(domain: "URL Error", code: 0)))
+            return
         }
-        
-        var items: [Item] = []
-        
-        for movieDict in results {
-            let item = Item()
-            
-            item.id = movieDict["id"] as? Int ?? 0
-            
-            if let title = movieDict["title"] as? String {
-                item.testTitle = title
-            } else if let originalTitle = movieDict["original_title"] as? String {
-                item.testTitle = originalTitle
-            } else {
-                item.testTitle = "Без названия"
+
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            if let error = error {
+                completion(.failure(error))
+                return
             }
-            
-            if let releaseDate = movieDict["release_date"] as? String, releaseDate.count >= 4 {
-                item.testYeah = String(releaseDate.prefix(4))
-            } else {
-                item.testYeah = "Неизвестно"
+            guard let data = data else {
+                completion(.failure(NSError(domain: "Data Error", code: 0)))
+                return
             }
-            
-            if let voteAverage = movieDict["vote_average"] as? Double {
-                item.testRating = String(format: "%.1f", voteAverage)
-            } else {
-                item.testRating = "0.0"
+
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    completion(.success(json))
+                } else {
+                    completion(.failure(NSError(domain: "Parsing Error", code: 0)))
+                }
+            } catch {
+                completion(.failure(error))
             }
-            
-            if let posterPath = movieDict["poster_path"] as? String {
-                // Важно: posterPath уже начинается с "/" — просто добавляем baseImageURL + posterPath
-                item.testPic = baseImageURL + posterPath
-            } else {
-                item.testPic = ""
-            }
-            
-            items.append(item)
-        }
-        
-        return items
+        }.resume()
+    }
+
+    // Остальные категории фильмов
+    func fetchNowPlaying(completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        dataRequest(endpoint: "now_playing", completion: completion)
+    }
+
+    func fetchTopRated(completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        dataRequest(endpoint: "top_rated", completion: completion)
+    }
+
+    func fetchUpcoming(completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        dataRequest(endpoint: "upcoming", completion: completion)
     }
 }

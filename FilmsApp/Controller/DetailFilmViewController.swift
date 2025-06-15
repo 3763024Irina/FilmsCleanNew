@@ -11,7 +11,6 @@ class DetailFilmViewController: UIViewController {
         case show, pop
     }
     
-    // MARK: - Properties
     var item: Item? {
         didSet {
             DispatchQueue.main.async { [weak self] in
@@ -22,9 +21,10 @@ class DetailFilmViewController: UIViewController {
     
     var film: Item? {
         didSet {
-            DispatchQueue.main.async { [weak self] in
-                self?.configureWithFilm()
-                self?.updateLikeButton()
+            DispatchQueue.main.async {
+                self.configureWithFilm()
+                self.updateLikeButton()
+                self.loadPreviewImages()
             }
         }
     }
@@ -36,124 +36,113 @@ class DetailFilmViewController: UIViewController {
     
     weak var delegate: DetailFilmViewControllerDelegate?
     
-    private let realm: Realm = {
-        do {
-            return try Realm()
-        } catch {
-            fatalError("❌ Ошибка инициализации Realm: \(error)")
-        }
-    }()
+    private let realm: Realm = try! Realm()
     
     private static var imageCache = NSCache<NSString, UIImage>()
     private let imageBaseURL = "https://image.tmdb.org/t/p"
     private let posterSize = "w780"
+    private let previewSize = "w300"
+    
+    private var previewImages: [String] = []
     
     // MARK: - UI Elements
+    private let posterImageView = UIImageView()
+    private let backdropImageView = UIImageView()
+    private let titleLabel = UILabel()
+    private let idLabel = UILabel()
+    private let yearLabel = UILabel()
+    private let ratingLabel = UILabel()
+    private let overviewLabel = UILabel()
+    private let likeButton = UIButton(type: .system)
+    private let showAllImagesButton = UIButton(type: .system)
     
-    private let posterImageView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFill
-        iv.clipsToBounds = true
-        iv.layer.cornerRadius = 8
-        iv.isUserInteractionEnabled = true
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
+    private let previewImagesCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.itemSize = CGSize(width: 120, height: 80)
+        layout.minimumLineSpacing = 8
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.showsHorizontalScrollIndicator = false
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        collectionView.register(PreviewImageCell.self, forCellWithReuseIdentifier: PreviewImageCell.identifier)
+        return collectionView
     }()
-    
-    private let backdropImageView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFill
-        iv.clipsToBounds = true
-        iv.layer.cornerRadius = 8
-        iv.alpha = 0.4
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
-    }()
-    
-    private let titleLabel: UILabel = {
-        let lbl = UILabel()
-        lbl.font = .boldSystemFont(ofSize: 22)
-        lbl.textAlignment = .center
-        lbl.numberOfLines = 2
-        lbl.adjustsFontSizeToFitWidth = true
-        lbl.minimumScaleFactor = 0.8
-        lbl.translatesAutoresizingMaskIntoConstraints = false
-        return lbl
-    }()
-    
-    private let idLabel: UILabel = {
-        let lbl = UILabel()
-        lbl.font = .italicSystemFont(ofSize: 14)
-        lbl.textColor = .gray
-        lbl.translatesAutoresizingMaskIntoConstraints = false
-        return lbl
-    }()
-    
-    private let yearLabel: UILabel = {
-        let lbl = UILabel()
-        lbl.font = .systemFont(ofSize: 18)
-        lbl.translatesAutoresizingMaskIntoConstraints = false
-        return lbl
-    }()
-    
-    private let ratingLabel: UILabel = {
-        let lbl = UILabel()
-        lbl.font = .systemFont(ofSize: 18)
-        lbl.translatesAutoresizingMaskIntoConstraints = false
-        return lbl
-    }()
-    
-    private let overviewLabel: UILabel = {
-        let lbl = UILabel()
-        lbl.font = .systemFont(ofSize: 16)
-        lbl.numberOfLines = 0
-        lbl.translatesAutoresizingMaskIntoConstraints = false
-        return lbl
-    }()
-    
-    private let likeButton: UIButton = {
-        let btn = UIButton(type: .system)
-        btn.tintColor = .systemRed
-        btn.translatesAutoresizingMaskIntoConstraints = false
-        return btn
-    }()
-    
-    // MARK: - Lifecycle
     
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
-        
         setupTransition()
         setupUI()
         setupCloseButton()
         setupLikeButton()
         setupDoubleTapGesture()
-        
-        updateLikeButton()
-        
-        // Если film уже задан, загрузим данные на UI
-        if let film = film {
-            configureWithFilm()
-        }
+        previewImagesCollectionView.delegate = self
+        previewImagesCollectionView.dataSource = self
     }
     
-    // MARK: - Setup Methods
+    private func buildImageURL(baseURL: String, size: String, path: String) -> URL? {
+        var base = baseURL
+        if base.hasSuffix("/") {
+            base.removeLast()
+        }
+        var sizePart = size
+        if sizePart.hasPrefix("/") {
+            sizePart.removeFirst()
+        }
+        if sizePart.hasSuffix("/") {
+            sizePart.removeLast()
+        }
+        var pathPart = path
+        if !pathPart.hasPrefix("/") {
+            pathPart = "/" + pathPart
+        }
+        let fullString = "\(base)/\(sizePart)\(pathPart)"
+        return URL(string: fullString)
+    }
     
     private func setupTransition() {
         transition.start = start
         transition.transitionProfile = .show
-        transition.onCompleted = { print("✅ Переход завершён (show)") }
-        transition.onDismissed = { print("👈 Переход завершён (pop)") }
-        
         transitioningDelegate = self
         modalPresentationStyle = .custom
     }
     
     private func setupUI() {
-        view.addSubview(backdropImageView)
-        let views = [posterImageView, titleLabel, idLabel, yearLabel, ratingLabel, overviewLabel, likeButton]
-        views.forEach { view.addSubview($0) }
+        [backdropImageView, posterImageView, likeButton,
+         titleLabel, idLabel, yearLabel, ratingLabel,
+         overviewLabel, previewImagesCollectionView,
+         showAllImagesButton].forEach {
+            $0.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview($0)
+        }
+        
+        posterImageView.contentMode = .scaleAspectFill
+        posterImageView.clipsToBounds = true
+        posterImageView.isUserInteractionEnabled = true
+        posterImageView.layer.cornerRadius = 8
+        
+        backdropImageView.contentMode = .scaleAspectFill
+        backdropImageView.clipsToBounds = true
+        backdropImageView.layer.cornerRadius = 8
+        backdropImageView.alpha = 0.4
+        
+        titleLabel.font = .boldSystemFont(ofSize: 22)
+        titleLabel.textAlignment = .center
+        titleLabel.numberOfLines = 2
+        
+        idLabel.font = .italicSystemFont(ofSize: 14)
+        idLabel.textColor = .gray
+        
+        yearLabel.font = .systemFont(ofSize: 18)
+        ratingLabel.font = .systemFont(ofSize: 18)
+        
+        overviewLabel.font = .systemFont(ofSize: 16)
+        overviewLabel.numberOfLines = 0
+        
+        likeButton.tintColor = .systemRed
+        
+        showAllImagesButton.setTitle("Все изображения >", for: .normal)
+        showAllImagesButton.addTarget(self, action: #selector(showAllImagesTapped), for: .touchUpInside)
         
         NSLayoutConstraint.activate([
             backdropImageView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
@@ -161,10 +150,10 @@ class DetailFilmViewController: UIViewController {
             backdropImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             backdropImageView.heightAnchor.constraint(equalToConstant: 380),
             
-            posterImageView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
-            posterImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            posterImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            posterImageView.heightAnchor.constraint(equalToConstant: 380),
+            posterImageView.topAnchor.constraint(equalTo: backdropImageView.topAnchor),
+            posterImageView.leadingAnchor.constraint(equalTo: backdropImageView.leadingAnchor),
+            posterImageView.trailingAnchor.constraint(equalTo: backdropImageView.trailingAnchor),
+            posterImageView.heightAnchor.constraint(equalTo: backdropImageView.heightAnchor),
             
             likeButton.topAnchor.constraint(equalTo: posterImageView.topAnchor, constant: 12),
             likeButton.trailingAnchor.constraint(equalTo: posterImageView.trailingAnchor, constant: -12),
@@ -187,17 +176,24 @@ class DetailFilmViewController: UIViewController {
             overviewLabel.topAnchor.constraint(equalTo: ratingLabel.bottomAnchor, constant: 16),
             overviewLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             overviewLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
-            overviewLabel.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16)
+            
+            previewImagesCollectionView.topAnchor.constraint(equalTo: overviewLabel.bottomAnchor, constant: 20),
+            previewImagesCollectionView.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            previewImagesCollectionView.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
+            previewImagesCollectionView.heightAnchor.constraint(equalToConstant: 80),
+            
+            showAllImagesButton.topAnchor.constraint(equalTo: previewImagesCollectionView.bottomAnchor, constant: 8),
+            showAllImagesButton.trailingAnchor.constraint(equalTo: previewImagesCollectionView.trailingAnchor),
+            showAllImagesButton.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -20)
         ])
     }
     
     private func setupCloseButton() {
         let closeButton = UIButton(type: .system)
-        closeButton.setTitle("Close", for: .normal)
+        closeButton.setTitle("Закрыть", for: .normal)
         closeButton.translatesAutoresizingMaskIntoConstraints = false
         closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
         view.addSubview(closeButton)
-        
         NSLayoutConstraint.activate([
             closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
             closeButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16)
@@ -206,7 +202,6 @@ class DetailFilmViewController: UIViewController {
     
     private func setupLikeButton() {
         likeButton.setTitle("♡ Like", for: .normal)
-        likeButton.setTitleColor(.systemBlue, for: .normal)
         likeButton.addTarget(self, action: #selector(likeButtonTapped), for: .touchUpInside)
     }
     
@@ -216,101 +211,65 @@ class DetailFilmViewController: UIViewController {
         posterImageView.addGestureRecognizer(doubleTap)
     }
     
-    // MARK: - Actions
-    
     @objc private func closeTapped() {
         dismiss(animated: true)
     }
     
     @objc private func likeButtonTapped() {
         guard let film = film else { return }
-        do {
-            try realm.write {
-                film.isLiked.toggle()
-            }
-            animateLikeButton()
-            updateLikeButton()
-            delegate?.didUpdateFilm(film)
-        } catch {
-            print("❌ Ошибка обновления like в Realm: \(error)")
+        try? realm.write {
+            film.isLiked.toggle()
         }
+        animateLikeButton()
+        updateLikeButton()
+        delegate?.didUpdateFilm(film)
     }
     
     @objc private func handleDoubleTap() {
-        guard let film = film, !film.testPic.isEmpty else { return }
-        
+        guard let film = film, let url = imageURL(for: film.testPic) else { return }
         let fullscreenVC = ImageFullscreenViewController()
         fullscreenVC.imageBaseURL = imageBaseURL
         fullscreenVC.posterSize = posterSize
-        
-        if let url = imageURL(for: film.testPic) {
-            fullscreenVC.imageUrl = url
-        } else {
-            fullscreenVC.itemId = film.id
-        }
-        
+        fullscreenVC.imageUrl = url
         fullscreenVC.modalPresentationStyle = .fullScreen
         present(fullscreenVC, animated: true)
     }
     
-    // MARK: - Helper Methods
+    @objc private func showAllImagesTapped() {
+        guard let film = film else { return }
+        let galleryVC = FullImageGalleryViewController()
+        galleryVC.movieId = film.id
+        galleryVC.modalPresentationStyle = .fullScreen
+        present(galleryVC, animated: true)
+    }
+
     
     private func configureWithFilm() {
-        guard let film = film else {
-            clearUI()
+        guard let film = film else { return }
+        titleLabel.text = film.testTitle
+        idLabel.text = "ID: \(film.id)"
+        yearLabel.text = "Год: \(film.testYeah)"
+        ratingLabel.text = "⭐️ \(film.testRating)/10"
+        overviewLabel.text = film.testDescription
+        
+        if let url = imageURL(for: film.testPic) {
+            loadImage(from: url, into: posterImageView)
+            loadImage(from: url, into: backdropImageView)
+        }
+    }
+    
+    private func loadImage(from url: URL, into imageView: UIImageView) {
+        if let cached = Self.imageCache.object(forKey: url.absoluteString as NSString) {
+            imageView.image = cached
             return
         }
-        
-        // Заголовок
-        titleLabel.text = film.testTitle.isEmpty ? "Без названия" : film.testTitle
-        
-        // ID
-        idLabel.text = "ID: \(film.id)"
-        
-        // Год выпуска (если есть)
-        yearLabel.text = film.testYeah.isEmpty ? "Год неизвестен" : "Год выпуска: \(film.testYeah)"
-        
-        // Рейтинг
-        if let rating = Double(film.testRating), rating > 0 {
-            ratingLabel.text = "⭐️ \(String(format: "%.1f", rating))/10"
-            ratingLabel.textColor = .systemOrange
-        } else {
-            ratingLabel.text = "Нет рейтинга"
-            ratingLabel.textColor = .secondaryLabel
-        }
-        
-        // Описание (overview)
-        if !film.testDescription.isEmpty {
-            overviewLabel.text = film.testDescription
-        } else {
-            overviewLabel.text = "Описание будет позже..."
-        }
-        
-        // Картинка постера и фон
-        if let posterURL = imageURL(for: film.testPic) {
-            loadImage(from: posterURL, into: posterImageView)
-            loadImage(from: posterURL, into: backdropImageView)
-        } else {
-            setPlaceholderImages()
-        }
-        
-        likeButton.isEnabled = true
-    }
-    
-    private func clearUI() {
-        titleLabel.text = "Нет данных"
-        idLabel.text = ""
-        yearLabel.text = "Год неизвестен"
-        ratingLabel.text = "Нет рейтинга"
-        overviewLabel.text = "Описание отсутствует"
-        setPlaceholderImages()
-        likeButton.isEnabled = false
-    }
-    
-    private func setPlaceholderImages() {
-        let placeholder = UIImage(named: "placeholder")
-        posterImageView.image = placeholder
-        backdropImageView.image = placeholder
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data, let image = UIImage(data: data) else { return }
+            Self.imageCache.setObject(image, forKey: url.absoluteString as NSString)
+            DispatchQueue.main.async {
+                imageView.image = image
+            }
+        }.resume()
     }
     
     private func imageURL(for path: String) -> URL? {
@@ -319,114 +278,100 @@ class DetailFilmViewController: UIViewController {
         return URL(string: "\(imageBaseURL)/\(posterSize)/\(trimmed)")
     }
     
-    private func loadImage(from url: URL, into imageView: UIImageView) {
-        if let cachedImage = Self.imageCache.object(forKey: url.absoluteString as NSString) {
-            DispatchQueue.main.async {
-                imageView.image = cachedImage
-            }
-            return
-        }
-        
-        URLSession.shared.dataTask(with: url) { data, _, error in
-            guard let data = data, error == nil, let image = UIImage(data: data) else {
-                DispatchQueue.main.async {
-                    imageView.image = UIImage(named: "placeholder")
-                }
-                return
-            }
-            
-            Self.imageCache.setObject(image, forKey: url.absoluteString as NSString)
-            DispatchQueue.main.async {
-                imageView.image = image
-            }
-        }.resume()
-    }
-    
     private func updateLikeButton() {
-        guard let film = film else {
-            likeButton.setTitle("♡ Like", for: .normal)
-            likeButton.setTitleColor(.systemBlue, for: .normal)
-            likeButton.isEnabled = false
-            return
-        }
-        
+        guard let film = film else { return }
         let title = film.isLiked ? "♥️ Liked" : "♡ Like"
-        let color = film.isLiked ? UIColor.systemRed : UIColor.systemBlue
-        
         likeButton.setTitle(title, for: .normal)
-        likeButton.setTitleColor(color, for: .normal)
-        likeButton.isEnabled = true
+        likeButton.setTitleColor(film.isLiked ? .systemRed : .systemBlue, for: .normal)
     }
     
     private func animateLikeButton() {
-        UIView.animate(withDuration: 0.2,
-                       animations: { self.likeButton.transform = CGAffineTransform(scaleX: 1.3, y: 1.3) },
-                       completion: { _ in
+        UIView.animate(withDuration: 0.2, animations: {
+            self.likeButton.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
+        }) { _ in
             UIView.animate(withDuration: 0.2) {
                 self.likeButton.transform = .identity
             }
-        })
-    }
-    
-    // MARK: - Async loading full details (если нужно)
-    func loadFullMovieDetails(movieId: Int) async {
-        do {
-            let fullDetails = try await fetchMovieDetailsFromAPI(movieId: movieId)
-            // Обновляем модель и UI
-            try realm.write {
-                item?.testDescription = fullDetails.testDescription
-                item?.testRating = fullDetails.testRating
-                item?.testTitle = fullDetails.testTitle
-                item?.testPic = fullDetails.testPic
-                item?.testYeah = fullDetails.testYeah
-            }
-            DispatchQueue.main.async {
-                self.film = self.item
-                // Обновите UI здесь, если нужно
-            }
-        } catch {
-            print("Ошибка загрузки деталей фильма: \(error)")
         }
     }
     
-    // Новая функция для получения деталей фильма из TMDb API
-    func fetchMovieDetailsFromAPI(movieId: Int) async throws -> Item {
-        let apiKey = "ВАШ_API_КЛЮЧ"
-        let urlString = "https://api.themoviedb.org/3/movie/\(movieId)?api_key=\(apiKey)&language=ru-RU"
-        guard let url = URL(string: urlString) else {
-            throw NSError(domain: "InvalidURL", code: 0, userInfo: nil)
+    private func loadPreviewImages() {
+        guard let id = film?.id else {
+            print("❌ Нет ID фильма для загрузки изображений.")
+            return
         }
         
-        let (data, _) = try await URLSession.shared.data(from: url)
-        
-        guard
-            let jsonObject = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
-            throw NSError(domain: "ParsingError", code: 0, userInfo: nil)
+        Task {
+            do {
+                // ✅ Используй API Key v3 (НЕ JWT-токен!)
+                let apiKey = "ab376f359fcef3b2030735ceea2eeaf"
+                let urlString = "https://api.themoviedb.org/3/movie/\(id)/images?api_key=\(apiKey)&language=ru-RU"
+                guard let url = URL(string: urlString) else {
+                    print("❌ Неверный URL: \(urlString)")
+                    return
+                }
+                
+                print("📡 Запрос изображений по URL: \(url)")
+                
+                let (data, response) = try await URLSession.shared.data(from: url)
+                
+                if let httpResponse = response as? HTTPURLResponse {
+                    print("📥 Статус-код ответа: \(httpResponse.statusCode)")
+                    if httpResponse.statusCode != 200 {
+                        print("❌ Ошибка сервера TMDb: \(httpResponse.statusCode)")
+                    }
+                }
+                
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    print("📄 Ответ JSON:\n\(jsonString)")
+                }
+                
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    print("❌ Невозможно разобрать JSON.")
+                    return
+                }
+                
+                let backdrops = (json["backdrops"] as? [[String: Any]]) ?? []
+                self.previewImages = backdrops.prefix(3).compactMap { $0["file_path"] as? String }
+                
+                print("✅ Загружено превью: \(self.previewImages)")
+                
+                DispatchQueue.main.async {
+                    self.previewImagesCollectionView.reloadData()
+                }
+                
+            } catch {
+                print("❌ Ошибка загрузки изображений: \(error.localizedDescription)")
+            }
         }
-        
-        let movieItem = Item()
-        movieItem.update(from: jsonObject)
-        movieItem.id = movieId
-        
-        return movieItem
     }
 }
-    // MARK: - UIViewControllerTransitioningDelegate
     
-    extension DetailFilmViewController: UIViewControllerTransitioningDelegate {
-        func animationController(forPresented presented: UIViewController,
-                                 presenting: UIViewController,
-                                 source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
-            transition.transitionProfile = .show
-            transition.start = start
-            return transition
+    extension DetailFilmViewController: UICollectionViewDataSource, UICollectionViewDelegate {
+        func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+            return previewImages.count
         }
-        
-        func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
-            transition.transitionProfile = .pop
-            transition.start = start
-            return transition
+        func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PreviewImageCell.identifier, for: indexPath) as! PreviewImageCell
+            let path = previewImages[indexPath.item]
+            if let url = buildImageURL(baseURL: imageBaseURL, size: previewSize, path: path) {
+                cell.configure(with: url)
+            }
+            return cell
         }
     }
 
+
+extension DetailFilmViewController: UIViewControllerTransitioningDelegate {
+    func animationController(forPresented presented: UIViewController, presenting: UIViewController, source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        transition.transitionProfile = .show
+        transition.start = start
+        return transition
+    }
+
+    func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        transition.transitionProfile = .pop
+        transition.start = start
+        return transition
+    }
+}

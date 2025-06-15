@@ -22,7 +22,6 @@ class FavoritesViewController: UIViewController {
         }
     }()
 
-
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -100,9 +99,15 @@ extension FavoritesViewController: MyCustomCellDelegate {
     func didTapLikeButton(on cell: MyCustomCell) {
         guard let indexPath = collectionView.indexPath(for: cell) else { return }
         let item = favoriteItems[indexPath.item]
-        try? realm.write {
-            item.isLiked.toggle()
+        
+        do {
+            try realm.write {
+                item.isLiked.toggle()
+            }
+        } catch {
+            print("❌ Ошибка при сохранении лайка: \(error)")
         }
+        
         loadFavorites()
     }
 

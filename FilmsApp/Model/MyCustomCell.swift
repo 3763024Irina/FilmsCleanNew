@@ -1,5 +1,6 @@
 import UIKit
 
+// MARK: - Протокол делегата
 protocol MyCustomCellDelegate: AnyObject {
     func didTapLikeButton(on cell: MyCustomCell)
     func didTapCell(_ cell: MyCustomCell)
@@ -162,11 +163,9 @@ class MyCustomCell: UICollectionViewCell {
                    imageBaseURL: String = "https://image.tmdb.org/t/p",
                    posterSize: String = "w780") {
         
-        // Название и год
         titleLabel.text = item.testTitle.isEmpty ? "Без названия" : item.testTitle
         yearLabel.text = item.testYeah.isEmpty ? "Год неизвестен" : item.testYeah
         
-        // Рейтинг
         if let rating = Double(item.testRating), rating > 0 {
             ratingLabel.text = "⭐️ \(item.testRating)"
             ratingLabel.textColor = rating >= 7 ? .systemGreen : .systemOrange
@@ -175,11 +174,9 @@ class MyCustomCell: UICollectionViewCell {
             ratingLabel.textColor = .secondaryLabel
         }
         
-        // Лайк
         let isLiked = item.isLiked
         likeButton.setImage(UIImage(systemName: isLiked ? "heart.fill" : "heart"), for: .normal)
         
-        // Загрузка изображения с кэшем
         let path = item.testPic.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard !path.isEmpty else {
             imageView.image = UIImage(named: "placeholder")
