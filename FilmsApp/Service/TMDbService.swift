@@ -32,10 +32,8 @@ class TMDbService {
         for movieDict in results {
             let item = Item()
             
-            // id
             item.id = movieDict["id"] as? Int ?? 0
             
-            // название фильма (title или original_title)
             if let title = movieDict["title"] as? String {
                 item.testTitle = title
             } else if let originalTitle = movieDict["original_title"] as? String {
@@ -44,23 +42,20 @@ class TMDbService {
                 item.testTitle = "Без названия"
             }
             
-            // год выпуска (из release_date, формат "YYYY-MM-DD")
             if let releaseDate = movieDict["release_date"] as? String, releaseDate.count >= 4 {
-                let year = String(releaseDate.prefix(4))
-                item.testYeah = year
+                item.testYeah = String(releaseDate.prefix(4))
             } else {
                 item.testYeah = "Неизвестно"
             }
             
-            // рейтинг (vote_average)
             if let voteAverage = movieDict["vote_average"] as? Double {
                 item.testRating = String(format: "%.1f", voteAverage)
             } else {
                 item.testRating = "0.0"
             }
             
-            // формируем полный URL для картинки и сохраняем в testPic
             if let posterPath = movieDict["poster_path"] as? String {
+                // Важно: posterPath уже начинается с "/" — просто добавляем baseImageURL + posterPath
                 item.testPic = baseImageURL + posterPath
             } else {
                 item.testPic = ""

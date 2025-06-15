@@ -23,6 +23,7 @@
 		8C809A882DFC97D10054362D /* FullPicViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C809A872DFC97D10054362D /* FullPicViewController.swift */; };
 		8CB55D432DC1481F004F27A0 /* RoundingTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB55D422DC1481F004F27A0 /* RoundingTransition.swift */; };
 		8CB55D492DCD0C88004F27A0 /* ImageFullscreenViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB55D482DCD0C88004F27A0 /* ImageFullscreenViewController.swift */; };
+		8CC221232DFE0CB300141A17 /* FavoritesViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CC221222DFE0CB300141A17 /* FavoritesViewController.swift */; };
 		8CED45FE2DFB5CFD00909CC6 /* TMDbService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CED45FD2DFB5CFD00909CC6 /* TMDbService.swift */; };
 		8CED46042DFB6CE800909CC6 /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CED46032DFB6CE800909CC6 /* Model.swift */; };
 /* End PBXBuildFile section */
@@ -47,6 +48,7 @@
 		8C809A872DFC97D10054362D /* FullPicViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullPicViewController.swift; sourceTree = "<group>"; };
 		8CB55D422DC1481F004F27A0 /* RoundingTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundingTransition.swift; sourceTree = "<group>"; };
 		8CB55D482DCD0C88004F27A0 /* ImageFullscreenViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageFullscreenViewController.swift; sourceTree = "<group>"; };
+		8CC221222DFE0CB300141A17 /* FavoritesViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesViewController.swift; sourceTree = "<group>"; };
 		8CED45FD2DFB5CFD00909CC6 /* TMDbService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMDbService.swift; sourceTree = "<group>"; };
 		8CED46032DFB6CE800909CC6 /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
 		B6CB31E5C3BC7AC396DB926B /* Pods-FilmsApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FilmsApp.release.xcconfig"; path = "Target Support Files/Pods-FilmsApp/Pods-FilmsApp.release.xcconfig"; sourceTree = "<group>"; };
@@ -125,6 +127,7 @@
 				61D0A56926B2833C00FD68FF /* MainViewController.swift */,
 				61D0A57B26B2A86C00FD68FF /* DetailFilmViewController.swift */,
 				8CB55D482DCD0C88004F27A0 /* ImageFullscreenViewController.swift */,
+				8CC221222DFE0CB300141A17 /* FavoritesViewController.swift */,
 			);
 			path = Controller;
 			sourceTree = "<group>";
@@ -276,6 +279,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8CC221232DFE0CB300141A17 /* FavoritesViewController.swift in Sources */,
 				8CED46042DFB6CE800909CC6 /* Model.swift in Sources */,
 				8CB55D432DC1481F004F27A0 /* RoundingTransition.swift in Sources */,
 				8C809A862DFC93B20054362D /* MovieResponce.swift in Sources */,

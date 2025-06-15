@@ -12,9 +12,22 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = (scene as? UIWindowScene) else { return }
 
         let window = UIWindow(windowScene: windowScene)
+
+        // Фильмы
         let mainVC = MainViewController()
-        let navVC = UINavigationController(rootViewController: mainVC)
-        window.rootViewController = navVC
+        let mainNav = UINavigationController(rootViewController: mainVC)
+        mainNav.tabBarItem = UITabBarItem(title: "Фильмы", image: UIImage(systemName: "film"), tag: 0)
+
+        // Избранное
+        let favoritesVC = FavoritesViewController()
+        let favoritesNav = UINavigationController(rootViewController: favoritesVC)
+        favoritesNav.tabBarItem = UITabBarItem(title: "Избранное", image: UIImage(systemName: "heart.fill"), tag: 1)
+
+        // Tab Bar Controller
+        let tabBarController = UITabBarController()
+        tabBarController.viewControllers = [mainNav, favoritesNav]
+
+        window.rootViewController = tabBarController
         self.window = window
         window.makeKeyAndVisible()
     }

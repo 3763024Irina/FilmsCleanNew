@@ -1,19 +1,17 @@
-import Foundation
+import UIKit
 import RealmSwift
-
 class Item: Object {
     @objc dynamic var id = 0
     @objc dynamic var testTitle = ""
     @objc dynamic var testYeah = ""
     @objc dynamic var testRating = ""
-    @objc dynamic var testPic = ""  // сюда будет полный URL картинки
+    @objc dynamic var testPic = ""  // полный URL картинки
+    @objc dynamic var testDescription = "" // Описание фильма
     @objc dynamic var isLiked = false
 
     override static func primaryKey() -> String? {
         return "id"
     }
-
-    private let baseImageURL = "https://image.tmdb.org/t/p/w780"
 
     func update(from dict: [String: Any]) {
         if let title = dict["title"] as? String {
@@ -26,9 +24,12 @@ class Item: Object {
             testRating = String(format: "%.1f", rating)
         }
         if let posterPath = dict["poster_path"] as? String {
-                testPic = "https://image.tmdb.org/t/p/w780" + posterPath
-            } else {
-                testPic = ""
+            testPic = "https://image.tmdb.org/t/p/w780" + posterPath
+        } else {
+            testPic = ""
+        }
+        if let overview = dict["overview"] as? String {
+            testDescription = overview
         }
     }
 }

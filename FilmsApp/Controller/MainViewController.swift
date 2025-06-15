@@ -1,7 +1,13 @@
 import UIKit
 import RealmSwift
 
-class MainViewController: UIViewController {
+class MainViewController: UIViewController, UIViewControllerTransitioningDelegate {
+
+    // MARK: - Properties
+
+    private let roundingTransition = RoundingTransition()
+    private var transitionStartPoint: CGPoint = .zero
+
     private var currentPage = 1
     private var isLoading = false
     private var hasMorePages = true
@@ -10,7 +16,7 @@ class MainViewController: UIViewController {
     private var notificationToken: NotificationToken?
 
     private var testArray: Results<Item>!
-    private var filteredArray: Results<Item>!
+    private var filteredItems: Results<Item>!
 
     private var collectionView: UICollectionView!
     private var searchBar: UISearchBar!
@@ -23,10 +29,14 @@ class MainViewController: UIViewController {
 
     private let apiKey = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhYjM3NzZmMzU5ZmNlZjNiMjAzMDczNWNlZWEyZWVhZiIsIm5iZiI6MTc0MzUyNTMxNy4yMjQsInN1YiI6IjY3ZWMxNWM1ZTE2YzYxZGE0NDQyYjFkNSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.DMeofagrq7g5PKLJZxCre1RiVxScyuJcaDjIcGq8Mc8"
 
+    // MARK: - Lifecycle
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .white
-        
+
+        title = "Фильмы"
+        view.backgroundColor = .systemBackground
+
         setupRealm()
         setupSearchBar()
         setupCollectionView()
@@ -34,8 +44,42 @@ class MainViewController: UIViewController {
         setupActivityIndicator()
 
         testArray = realm.objects(Item.self).sorted(byKeyPath: "id", ascending: true)
-        filteredArray = testArray
-        
+        filteredItems = testArray
+
+        observeRealmChanges()
+
+        Task {
+            await fetchTMDbConfiguration()
+            await fetchPopularMovies(page: currentPage)
+        }
+    }
+
+    deinit {
+        notificationToken?.invalidate()
+    }
+
+    // MARK: - Setup Methods
+
+    private func setupRealm() {
+        let config = Realm.Configuration(
+            schemaVersion: 3,
+            migrationBlock: { _, oldSchemaVersion in
+                if oldSchemaVersion < 3 {
+                    // Добавь миграцию при необходимости
+                }
+            },
+            deleteRealmIfMigrationNeeded: true
+        )
+        Realm.Configuration.defaultConfiguration = config
+
+        do {
+            realm = try Realm()
+        } catch {
+            fatalError("Ошибка инициализации Realm: \(error)")
+        }
+    }
+
+    private func observeRealmChanges() {
         notificationToken = testArray.observe { [weak self] changes in
             guard let self = self else { return }
             switch changes {
@@ -51,35 +95,11 @@ class MainViewController: UIViewController {
                 self.showErrorAlert(message: "Realm notification error: \(error.localizedDescription)")
             }
         }
-        
-        Task {
-            await fetchTMDbConfiguration()
-            await fetchPopularMovies(page: currentPage)
-        }
-    }
-
-    private func setupRealm() {
-        let config = Realm.Configuration(
-            schemaVersion: 3,
-            migrationBlock: { migration, oldSchemaVersion in
-                if oldSchemaVersion < 3 {
-                    // Миграции при необходимости
-                }
-            },
-            deleteRealmIfMigrationNeeded: true
-        )
-        Realm.Configuration.defaultConfiguration = config
-
-        do {
-            realm = try Realm()
-        } catch {
-            fatalError("Ошибка инициализации Realm: \(error)")
-        }
     }
 
     private func setupNavigationBar() {
         navigationController?.navigationBar.isHidden = false
-        title = "Films"
+        title = "Фильмы"
         let heartButton = UIBarButtonItem(
             image: UIImage(systemName: "heart.fill"),
             style: .plain,
@@ -95,38 +115,18 @@ class MainViewController: UIViewController {
         navigationItem.leftBarButtonItem = UIBarButtonItem(customView: activityIndicator)
     }
 
-    @objc func showLikedMovies() {
-        showingLikedOnly.toggle()
-        updateFilteredArray()
-    }
-
-    private func updateFilteredArray() {
-        DispatchQueue.main.async {
-            if let text = self.searchBar.text, !text.isEmpty {
-                if self.showingLikedOnly {
-                    self.filteredArray = self.testArray.filter("isLiked == true AND testTitle CONTAINS[c] %@", text)
-                } else {
-                    self.filteredArray = self.testArray.filter("testTitle CONTAINS[c] %@", text)
-                }
-            } else {
-                self.filteredArray = self.showingLikedOnly ? self.testArray.filter("isLiked == true") : self.testArray
-            }
-            self.collectionView.reloadData()
-        }
-    }
-
     private func setupSearchBar() {
         searchBar = UISearchBar()
         searchBar.delegate = self
-        searchBar.placeholder = "Search movies"
+        searchBar.placeholder = "Поиск фильмов"
         navigationItem.titleView = searchBar
     }
 
     private func setupCollectionView() {
         let layout = UICollectionViewFlowLayout()
-        layout.minimumInteritemSpacing = 5
-        layout.minimumLineSpacing = 5
-        layout.sectionInset = UIEdgeInsets(top: 5, left: 5, bottom: 5, right: 5)
+        layout.minimumInteritemSpacing = 8
+        layout.minimumLineSpacing = 8
+        layout.sectionInset = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
 
         collectionView = UICollectionView(frame: view.bounds, collectionViewLayout: layout)
         collectionView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -142,6 +142,13 @@ class MainViewController: UIViewController {
         view.addSubview(collectionView)
     }
 
+    // MARK: - Actions
+
+    @objc private func showLikedMovies() {
+        showingLikedOnly.toggle()
+        updateFilteredItems()
+    }
+
     @objc private func refreshMovies() {
         currentPage = 1
         hasMorePages = true
@@ -152,6 +159,25 @@ class MainViewController: UIViewController {
             }
         }
     }
+
+    // MARK: - Filtering & Updating
+
+    private func updateFilteredItems() {
+        DispatchQueue.main.async {
+            if let text = self.searchBar.text, !text.isEmpty {
+                if self.showingLikedOnly {
+                    self.filteredItems = self.testArray.filter("isLiked == true AND testTitle CONTAINS[c] %@", text)
+                } else {
+                    self.filteredItems = self.testArray.filter("testTitle CONTAINS[c] %@", text)
+                }
+            } else {
+                self.filteredItems = self.showingLikedOnly ? self.testArray.filter("isLiked == true") : self.testArray
+            }
+            self.collectionView.reloadData()
+        }
+    }
+
+    // MARK: - Network Requests
 
     private func fetchTMDbConfiguration() async {
         guard !apiKey.isEmpty else {
@@ -236,18 +262,31 @@ class MainViewController: UIViewController {
                     }
                     currentPage += 1
                 }
-                updateFilteredArray()
+                updateFilteredItems()
             }
         } catch {
             showErrorAlert(message: "Ошибка загрузки фильмов: \(error.localizedDescription)")
         }
+
         isLoading = false
         DispatchQueue.main.async { self.activityIndicator.stopAnimating() }
     }
 
     private func searchMovies(query: String) async {
-        guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://api.themoviedb.org/3/search/movie?query=\(encodedQuery)&language=ru-RU") else {
+        guard !query.isEmpty else {
+            updateFilteredItems()
+            return
+        }
+
+        DispatchQueue.main.async { self.activityIndicator.startAnimating() }
+
+        guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            DispatchQueue.main.async { self.activityIndicator.stopAnimating() }
+            return
+        }
+
+        guard let url = URL(string: "https://api.themoviedb.org/3/search/movie?query=\(encodedQuery)&language=ru-RU") else {
+            DispatchQueue.main.async { self.activityIndicator.stopAnimating() }
             return
         }
 
@@ -257,42 +296,44 @@ class MainViewController: UIViewController {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
         do {
-            DispatchQueue.main.async { self.activityIndicator.startAnimating() }
-
             let (data, _) = try await URLSession.shared.data(for: request)
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let results = json["results"] as? [[String: Any]] {
+
                 try realm.write {
+                    realm.delete(realm.objects(Item.self))
                     for movie in results {
                         let id = movie["id"] as? Int ?? 0
-                        if let existing = realm.object(ofType: Item.self, forPrimaryKey: id) {
-                            existing.update(from: movie)
+                        let item = Item()
+                        item.id = id
+                        item.testTitle = (movie["title"] as? String) ?? ""
+                        if let date = movie["release_date"] as? String, date.count >= 4 {
+                            item.testYeah = String(date.prefix(4))
                         } else {
-                            let item = Item()
-                            item.id = id
-                            item.testTitle = (movie["title"] as? String) ?? ""
-                            if let date = movie["release_date"] as? String, date.count >= 4 {
-                                item.testYeah = String(date.prefix(4))
-                            } else {
-                                item.testYeah = ""
-                            }
-                            if let rating = movie["vote_average"] as? Double {
-                                item.testRating = String(format: "%.1f", rating)
-                            } else {
-                                item.testRating = ""
-                            }
-                            item.testPic = (movie["poster_path"] as? String) ?? ""
-                            realm.add(item, update: .modified)
+                            item.testYeah = ""
                         }
+                        if let rating = movie["vote_average"] as? Double {
+                            item.testRating = String(format: "%.1f", rating)
+                        } else {
+                            item.testRating = ""
+                        }
+                        item.testPic = (movie["poster_path"] as? String) ?? ""
+                        realm.add(item, update: .modified)
                     }
                 }
-                updateFilteredArray()
+
+                currentPage = 2
+                hasMorePages = true
+                updateFilteredItems()
             }
         } catch {
             showErrorAlert(message: "Ошибка поиска фильмов: \(error.localizedDescription)")
         }
+
         DispatchQueue.main.async { self.activityIndicator.stopAnimating() }
     }
+
+    // MARK: - Alerts
 
     private func showErrorAlert(message: String) {
         DispatchQueue.main.async {
@@ -303,39 +344,75 @@ class MainViewController: UIViewController {
     }
 }
 
-// MARK: - UICollectionView
+// MARK: - UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, MyCustomCellDelegate
 
-extension MainViewController: UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
+extension MainViewController: UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, MyCustomCellDelegate {
+
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        filteredArray.count
-    }
-
-    func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        let offsetY = scrollView.contentOffset.y
-        let contentHeight = scrollView.contentSize.height
-        let frameHeight = scrollView.frame.size.height
-        
-        if offsetY > contentHeight - frameHeight * 1.5 {
-            Task {
-                await fetchPopularMovies(page: currentPage)
-            }
-        }
+        filteredItems.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "MyCustomCell", for: indexPath) as? MyCustomCell else {
             return UICollectionViewCell()
         }
-
-        let item = filteredArray[indexPath.item]
+        let item = filteredItems[indexPath.item]
         cell.configure(with: item, imageBaseURL: imageBaseURL, posterSize: posterSize)
         cell.delegate = self
         return cell
     }
 
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        let width = (collectionView.frame.width - 15) / 2
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let selectedItem = filteredItems[indexPath.item]
+        let detailVC = DetailFilmViewController()
+        detailVC.item = selectedItem
+        navigationController?.pushViewController(detailVC, animated: true)
+    }
+
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout,
+                        sizeForItemAt indexPath: IndexPath) -> CGSize {
+        let padding: CGFloat = 16 // sectionInsets left+right
+        let interItemSpacing: CGFloat = 8
+        let availableWidth = collectionView.bounds.width - padding - interItemSpacing
+        let width = availableWidth / 2
         return CGSize(width: width, height: width * 1.6)
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        let offsetY = scrollView.contentOffset.y
+        let contentHeight = scrollView.contentSize.height
+        let height = scrollView.frame.size.height
+
+        if offsetY > contentHeight - height * 2 && !isLoading && !showingLikedOnly && (searchBar.text?.isEmpty ?? true) {
+            Task {
+                await fetchPopularMovies(page: currentPage)
+            }
+        }
+    }
+
+    // MARK: - MyCustomCellDelegate
+
+    func didTapLikeButton(on cell: MyCustomCell) {
+        guard let indexPath = collectionView.indexPath(for: cell) else { return }
+        let item = filteredItems[indexPath.item]
+
+        try? realm.write {
+            item.isLiked.toggle()
+        }
+
+        if showingLikedOnly {
+            updateFilteredItems()
+        } else {
+            collectionView.reloadItems(at: [indexPath])
+        }
+    }
+
+    func didTapCell(_ cell: MyCustomCell) {
+        guard let indexPath = collectionView.indexPath(for: cell) else { return }
+        let selectedItem = filteredItems[indexPath.item]
+        let detailVC = DetailFilmViewController()
+        detailVC.item = selectedItem
+        navigationController?.pushViewController(detailVC, animated: true)
     }
 }
 
@@ -343,59 +420,18 @@ extension MainViewController: UICollectionViewDataSource, UICollectionViewDelega
 
 extension MainViewController: UISearchBarDelegate {
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        updateFilteredArray()
-
-        if !searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+        if searchText.isEmpty {
+            updateFilteredItems()
+        } else {
             Task {
                 await searchMovies(query: searchText)
             }
         }
     }
 
-    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.text = ""
+        updateFilteredItems()
         searchBar.resignFirstResponder()
-    }
-}
-
-// MARK: - MyCustomCellDelegate
-
-extension MainViewController: MyCustomCellDelegate {
-    func didTapLikeButton(on cell: MyCustomCell) {
-        guard let indexPath = collectionView.indexPath(for: cell) else { return }
-        let item = filteredArray[indexPath.item]
-
-        do {
-            try realm.write {
-                item.isLiked.toggle()
-            }
-            updateFilteredArray()
-        } catch {
-            showErrorAlert(message: "Ошибка при обновлении isLiked: \(error.localizedDescription)")
-        }
-    }
-
-    func didTapCell(_ cell: MyCustomCell) {
-        guard let indexPath = collectionView.indexPath(for: cell) else { return }
-        let selectedFilm = filteredArray[indexPath.item]
-
-        let storyboard = UIStoryboard(name: "Main", bundle: nil)
-        if let detailVC = storyboard.instantiateViewController(withIdentifier: "DetailFilmViewController") as? DetailFilmViewController {
-            detailVC.film = selectedFilm
-            detailVC.delegate = self
-            navigationController?.pushViewController(detailVC, animated: true)
-        }
-    }
-}
-
-// MARK: - DetailFilmViewControllerDelegate
-
-extension MainViewController: DetailFilmViewControllerDelegate {
-    func didUpdateFilm(_ film: Item) {
-        for (index, item) in filteredArray.enumerated() {
-            if item.id == film.id {
-                collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
-                break
-            }
-        }
     }
 }
