@@ -9,47 +9,6 @@ protocol MyCustomCellDelegate: AnyObject {
 class MyCustomCell: UICollectionViewCell {
     
     // MARK: - UI Elements
-    func configure(with item: Item) {
-        titleLabel.text = item.testTitle.isEmpty ? "Без названия" : item.testTitle
-        yearLabel.text = item.testYeah.isEmpty ? "Год неизвестен" : item.testYeah
-        
-        if let rating = Double(item.testRating), rating > 0 {
-            ratingLabel.text = "⭐️ \(item.testRating)"
-            ratingLabel.textColor = rating >= 7 ? .systemGreen : .systemOrange
-        } else {
-            ratingLabel.text = "Нет рейтинга"
-            ratingLabel.textColor = .secondaryLabel
-        }
-
-        likeButton.setImage(
-            UIImage(systemName: item.isLiked ? "heart.fill" : "heart"),
-            for: .normal
-        )
-
-        let path = item.testPic.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard !path.isEmpty else {
-            imageView.image = UIImage(named: "placeholder")
-            currentImageURL = nil
-            return
-        }
-
-        currentImageURL = path
-        imageView.image = UIImage(named: "placeholder")
-
-        ImageLoader.shared.loadImage(from: path) { [weak self] image, _ in
-            guard let self = self, self.currentImageURL == path else { return }
-            if let image = image {
-                UIView.transition(with: self.imageView,
-                                  duration: 0.3,
-                                  options: .transitionCrossDissolve,
-                                  animations: {
-                    self.imageView.image = image
-                })
-            }
-        }
-    }
-
-
     
     private let imageView: UIImageView = {
         let iv = UIImageView()
@@ -98,11 +57,9 @@ class MyCustomCell: UICollectionViewCell {
     // MARK: - Properties
     
     weak var delegate: MyCustomCellDelegate?
+    private var currentImagePath: String?
     
-    private static let imageCache = NSCache<NSString, UIImage>()
-    private var currentImageURL: String?
-    
-    // MARK: - Initialization
+    // MARK: - Init
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -116,7 +73,7 @@ class MyCustomCell: UICollectionViewCell {
         setupGesture()
     }
     
-    // MARK: - Setup UI
+    // MARK: - UI Setup
     
     private func setupUI() {
         contentView.backgroundColor = .systemBackground
@@ -129,25 +86,21 @@ class MyCustomCell: UICollectionViewCell {
         
         likeButton.addTarget(self, action: #selector(likeButtonTapped), for: .touchUpInside)
         
-        // Stack: rating + like button
         let ratingLikeStack = UIStackView(arrangedSubviews: [ratingLabel, likeButton])
         ratingLikeStack.axis = .horizontal
         ratingLikeStack.alignment = .center
         ratingLikeStack.spacing = 8
         
-        // Stack: year + ratingLikeStack
         let bottomStack = UIStackView(arrangedSubviews: [yearLabel, ratingLikeStack])
         bottomStack.axis = .horizontal
         bottomStack.alignment = .leading
         bottomStack.spacing = 16
         
-        // Stack: title + bottomStack
         let infoStack = UIStackView(arrangedSubviews: [titleLabel, bottomStack])
         infoStack.axis = .vertical
         infoStack.alignment = .leading
         infoStack.spacing = 6
         
-        // Main stack: imageView + infoStack
         let mainStack = UIStackView(arrangedSubviews: [imageView, infoStack])
         mainStack.axis = .vertical
         mainStack.alignment = .leading
@@ -169,8 +122,6 @@ class MyCustomCell: UICollectionViewCell {
             mainStack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -12),
         ])
     }
-    
-    // MARK: - Gesture Setup
     
     private func setupGesture() {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(cellTapped))
@@ -198,7 +149,7 @@ class MyCustomCell: UICollectionViewCell {
         }
     }
     
-    // MARK: - Configuration
+    // MARK: - Configure
     
     func configure(with item: Item,
                    imageBaseURL: String = "https://image.tmdb.org/t/p",
@@ -215,52 +166,33 @@ class MyCustomCell: UICollectionViewCell {
             ratingLabel.textColor = .secondaryLabel
         }
         
-        let isLiked = item.isLiked
-        likeButton.setImage(UIImage(systemName: isLiked ? "heart.fill" : "heart"), for: .normal)
+        likeButton.setImage(
+            UIImage(systemName: item.isLiked ? "heart.fill" : "heart"),
+            for: .normal
+        )
         
-        let path = item.testPic.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard !path.isEmpty else {
+        let trimmedPath = item.testPic.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !trimmedPath.isEmpty else {
             imageView.image = UIImage(named: "placeholder")
-            currentImageURL = nil
+            currentImagePath = nil
             return
         }
         
-        let fullURLString: String
-        if path.hasPrefix(posterSize) {
-            fullURLString = "\(imageBaseURL)/\(path)"
+        // Собираем URL
+        let fullPath: String
+        if trimmedPath.hasPrefix(posterSize) {
+            fullPath = "\(imageBaseURL)/\(trimmedPath)"
         } else {
-            fullURLString = "\(imageBaseURL)/\(posterSize)/\(path)"
+            fullPath = "\(imageBaseURL)/\(posterSize)/\(trimmedPath)"
         }
         
-        if currentImageURL == fullURLString,
-           let cachedImage = Self.imageCache.object(forKey: fullURLString as NSString) {
-            imageView.image = cachedImage
-            return
-        }
-        
-        currentImageURL = fullURLString
-        
-        if let cachedImage = Self.imageCache.object(forKey: fullURLString as NSString) {
-            imageView.image = cachedImage
-            return
-        }
-        
+        currentImagePath = fullPath
         imageView.image = UIImage(named: "placeholder")
         
-        guard let url = URL(string: fullURLString) else {
-            print("❌ Невалидный URL: \(fullURLString)")
-            return
-        }
-        
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
-            guard let self = self,
-                  let data = data,
-                  let image = UIImage(data: data),
-                  self.currentImageURL == fullURLString,
-                  error == nil else { return }
-            
-            Self.imageCache.setObject(image, forKey: fullURLString as NSString)
-            DispatchQueue.main.async {
+        ImageLoader.shared.loadImage(from: fullPath) { [weak self] image, _ in
+            guard let self = self else { return }
+            guard self.currentImagePath == fullPath else { return } // защита от переиспользования
+            if let image = image {
                 UIView.transition(with: self.imageView,
                                   duration: 0.3,
                                   options: .transitionCrossDissolve,
@@ -268,6 +200,6 @@ class MyCustomCell: UICollectionViewCell {
                     self.imageView.image = image
                 })
             }
-        }.resume()
+        }
     }
 }
