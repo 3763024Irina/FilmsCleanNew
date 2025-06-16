@@ -243,9 +243,11 @@ class MainViewController: UIViewController, MyCustomCellDelegate {
         guard !isLoading, hasMorePages else { return }
         isLoading = true
         DispatchQueue.main.async { self.activityIndicator.startAnimating() }
-
-        let urlString = "https://api.themoviedb.org/3/movie/\(category.title)?language=ru-RU&page=\(page)&api_key=\(apiKey)"
-
+        
+        let urlString = category.urlString(page: page) // используем правильный URL
+        
+        print("Загрузка фильмов с URL: \(urlString)") // для отладки
+        
         NetworkManager.shared.dataRequest(urlString: urlString) { [weak self] result in
             guard let self = self else { return }
             switch result {
@@ -253,43 +255,51 @@ class MainViewController: UIViewController, MyCustomCellDelegate {
                 do {
                     if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                        let results = json["results"] as? [[String: Any]] {
-
-                        if results.isEmpty {
-                            self.hasMorePages = false
-                        } else {
-                            try self.realm.write {
-                                if page == 1 {
-                                    self.realm.delete(self.realm.objects(Item.self))
-                                }
-                                for movie in results {
-                                    let id = movie["id"] as? Int ?? 0
-                                    if let existing = self.realm.object(ofType: Item.self, forPrimaryKey: id) {
-                                        existing.update(from: movie)
-                                    } else {
-                                        let item = Item()
-                                        item.id = id
-                                        item.update(from: movie)
-                                        self.realm.add(item, update: .modified)
+                        
+                        DispatchQueue.main.async {
+                            do {
+                                try self.realm.write {
+                                    if page == 1 {
+                                        self.realm.delete(self.realm.objects(Item.self))
+                                    }
+                                    for movie in results {
+                                        let id = movie["id"] as? Int ?? 0
+                                        if let existing = self.realm.object(ofType: Item.self, forPrimaryKey: id) {
+                                            existing.update(from: movie)
+                                        } else {
+                                            let item = Item()
+                                            item.id = id
+                                            item.update(from: movie)
+                                            self.realm.add(item, update: .modified)
+                                        }
                                     }
                                 }
+                                self.currentPage += 1
+                                self.updateFilteredItems()
+                            } catch {
+                                self.showErrorAlert(message: "Ошибка при записи в Realm: \(error.localizedDescription)")
                             }
-                            self.currentPage += 1
+                            self.activityIndicator.stopAnimating()
+                            self.isLoading = false
                         }
-                        self.updateFilteredItems()
                     }
                 } catch {
-                    self.showErrorAlert(message: "Ошибка парсинга фильмов: \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        self.showErrorAlert(message: "Ошибка парсинга фильмов: \(error.localizedDescription)")
+                        self.activityIndicator.stopAnimating()
+                        self.isLoading = false
+                    }
                 }
+                
             case .failure(let error):
-                self.showErrorAlert(message: "Ошибка загрузки фильмов: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.showErrorAlert(message: "Ошибка загрузки фильмов: \(error.localizedDescription)")
+                    self.activityIndicator.stopAnimating()
+                    self.isLoading = false
+                }
             }
-
-            self.isLoading = false
-            DispatchQueue.main.async { self.activityIndicator.stopAnimating() }
         }
     }
-
-
     // MARK: - Alerts
 
     private func showErrorAlert(message: String) {

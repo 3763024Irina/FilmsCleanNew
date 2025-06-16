@@ -303,7 +303,7 @@ class DetailFilmViewController: UIViewController {
         
         Task {
             do {
-                // ✅ Используй API Key v3 (НЕ JWT-токен!)
+              
                 let apiKey = "ab3776f359fcef3b2030735ceea2eeaf"
                 let urlString = "https://api.themoviedb.org/3/movie/\(id)/images?api_key=\(apiKey)&language=ru-RU"
                 guard let url = URL(string: urlString) else {
