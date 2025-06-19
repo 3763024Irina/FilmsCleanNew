@@ -4,7 +4,7 @@ import RealmSwift
 class MainViewController: UIViewController, MyCustomCellDelegate {
 
     // MARK: - Properties
-
+    private var roundingTransitionDelegate: RoundingTransitionDelegate?
     private static let imageCache = NSCache<NSString, UIImage>()
 
     private var segmentedControl: UISegmentedControl!
@@ -16,8 +16,8 @@ class MainViewController: UIViewController, MyCustomCellDelegate {
     private var realm: Realm!
     private var notificationToken: NotificationToken?
 
-    private var allItems: Results<Item>!       // Все элементы из Realm
-    private var filteredItems: Results<Item>!  // Отфильтрованные
+    private var allItems: Results<Item>!
+    private var filteredItems: Results<Item>!
 
     private var collectionView: UICollectionView!
     private var searchBar: UISearchBar!
@@ -64,9 +64,9 @@ class MainViewController: UIViewController, MyCustomCellDelegate {
 
     private func setupRealm() {
         let config = Realm.Configuration(
-            schemaVersion: 3,
+            schemaVersion: 4,
             migrationBlock: { _, oldSchemaVersion in
-                if oldSchemaVersion < 3 {
+                if oldSchemaVersion < 4 {
                     // Здесь можно добавить миграции Realm, если нужно
                 }
             },
@@ -166,8 +166,6 @@ class MainViewController: UIViewController, MyCustomCellDelegate {
         navigationItem.leftBarButtonItem = UIBarButtonItem(customView: activityIndicator)
     }
 
-    // MARK: - Actions
-
     @objc private func categoryChanged(_ sender: UISegmentedControl) {
         guard let category = MovieCategory(rawValue: sender.selectedSegmentIndex) else { return }
         selectedCategory = category
@@ -194,8 +192,6 @@ class MainViewController: UIViewController, MyCustomCellDelegate {
         }
     }
 
-    // MARK: - Data Handling
-
     private func updateFilteredItems() {
         if let text = searchBar.text, !text.isEmpty {
             if showingLikedOnly {
@@ -209,7 +205,7 @@ class MainViewController: UIViewController, MyCustomCellDelegate {
         collectionView.reloadData()
     }
 
-    // MARK: - Network Requests
+
 
     private func fetchTMDbConfiguration() async {
         guard !apiKey.isEmpty else {
@@ -353,7 +349,24 @@ class MainViewController: UIViewController, MyCustomCellDelegate {
         let storyboard = UIStoryboard(name: "Main", bundle: nil)
         if let detailVC = storyboard.instantiateViewController(withIdentifier: "DetailFilmViewController") as? DetailFilmViewController {
             detailVC.item = item
-            navigationController?.pushViewController(detailVC, animated: true)
+            detailVC.modalPresentationStyle = .custom
+
+            let transitionDelegate = RoundingTransitionDelegate()
+
+            // Определяем стартовую точку анимации — центр ячейки
+            if let cellFrame = collectionView.layoutAttributesForItem(at: indexPath)?.frame {
+                let cellRectInSuperview = collectionView.convert(cellFrame, to: collectionView.superview)
+                transitionDelegate.startPoint = CGPoint(x: cellRectInSuperview.midX, y: cellRectInSuperview.midY)
+            } else {
+                transitionDelegate.startPoint = view.center
+            }
+
+            detailVC.transitioningDelegate = transitionDelegate
+
+            // Сохраняем делегат, чтобы он не удалился сразу
+            self.roundingTransitionDelegate = transitionDelegate
+
+            present(detailVC, animated: true)
         }
     }
 }

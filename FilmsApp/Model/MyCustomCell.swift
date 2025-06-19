@@ -8,8 +8,6 @@ protocol MyCustomCellDelegate: AnyObject {
 
 class MyCustomCell: UICollectionViewCell {
     
-    // MARK: - UI Elements
-    
     private let imageView: UIImageView = {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFill
@@ -54,12 +52,10 @@ class MyCustomCell: UICollectionViewCell {
         return btn
     }()
     
-    // MARK: - Properties
     
     weak var delegate: MyCustomCellDelegate?
     private var currentImagePath: String?
     
-    // MARK: - Init
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -73,7 +69,6 @@ class MyCustomCell: UICollectionViewCell {
         setupGesture()
     }
     
-    // MARK: - UI Setup
     
     private func setupUI() {
         contentView.backgroundColor = .systemBackground
@@ -128,7 +123,6 @@ class MyCustomCell: UICollectionViewCell {
         contentView.addGestureRecognizer(tapGesture)
     }
     
-    // MARK: - Actions
     
     @objc private func likeButtonTapped() {
         animateLikeButton()
@@ -149,7 +143,6 @@ class MyCustomCell: UICollectionViewCell {
         }
     }
     
-    // MARK: - Configure
     
     func configure(with item: Item,
                    imageBaseURL: String = "https://image.tmdb.org/t/p",

@@ -11,9 +11,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
        
         let config = Realm.Configuration(
-            schemaVersion: 3,
+            schemaVersion: 4,
             migrationBlock: { migration, oldSchemaVersion in
-                if oldSchemaVersion < 3 {
+                if oldSchemaVersion < 4 {
                     migration.enumerateObjects(ofType: Item.className()) { oldObject, newObject in
                         if let oldTitle = oldObject?["testTitle"] as? String {
                             newObject?["testTitle"] = oldTitle

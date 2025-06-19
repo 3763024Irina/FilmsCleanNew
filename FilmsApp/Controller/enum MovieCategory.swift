@@ -11,7 +11,7 @@ enum MovieCategory: Int, CaseIterable {
     }
 
     private var language: String {
-        return "ru-RU"
+        return "fr-FR"
     }
 
     // Генерация URL с использованием URLComponents

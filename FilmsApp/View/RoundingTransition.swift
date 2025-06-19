@@ -1,9 +1,11 @@
 import UIKit
-
+import Foundation
+import RealmSwift
 class RoundingTransition: NSObject, UIViewControllerAnimatedTransitioning {
     
     enum TransitionProfile {
-        case show, pop
+        case show
+        case dismiss  
     }
     
     var transitionProfile: TransitionProfile = .show
@@ -21,7 +23,7 @@ class RoundingTransition: NSObject, UIViewControllerAnimatedTransitioning {
     
     private var dimmingColor: UIColor {
         if UITraitCollection.current.userInterfaceStyle == .dark {
-            return UIColor(white: 0, alpha: 0.8) // чуть светлее в темной теме
+            return UIColor(white: 0, alpha: 0.8)
         } else {
             return UIColor(white: 0, alpha: 0.5)
         }
@@ -35,8 +37,8 @@ class RoundingTransition: NSObject, UIViewControllerAnimatedTransitioning {
         switch transitionProfile {
         case .show:
             animateShow(using: transitionContext)
-        case .pop:
-            animatePop(using: transitionContext)
+        case .dismiss:
+            animateDismiss(using: transitionContext)
         }
     }
     
@@ -64,7 +66,6 @@ class RoundingTransition: NSObject, UIViewControllerAnimatedTransitioning {
         containerView.addSubview(dimmingView)
         containerView.addSubview(toView)
         
-        // Плавная анимация с UIViewPropertyAnimator для более плавного эффекта
         let animator = UIViewPropertyAnimator(duration: duration, curve: .easeInOut) {
             dimmingView.alpha = 1
             toView.center = containerView.center
@@ -81,7 +82,7 @@ class RoundingTransition: NSObject, UIViewControllerAnimatedTransitioning {
         animator.startAnimation()
     }
     
-    private func animatePop(using transitionContext: UIViewControllerContextTransitioning) {
+    private func animateDismiss(using transitionContext: UIViewControllerContextTransitioning) {
         guard let fromView = transitionContext.view(forKey: .from) else {
             transitionContext.completeTransition(false)
             return

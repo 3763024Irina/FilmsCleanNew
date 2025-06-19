@@ -9,6 +9,7 @@ class Item: Object {
     @objc dynamic var testPic = ""  // полный URL картинки
     @objc dynamic var testDescription = "" // Описание фильма
     @objc dynamic var isLiked = false
+    let testPreviewPictures = List<String>() // Превью-изображения
 
     override static func primaryKey() -> String? {
         return "id"
@@ -32,10 +33,26 @@ class Item: Object {
         if let overview = dict["overview"] as? String {
             testDescription = overview
         }
+
+        // Превьюшки (опционально)
+        if let previews = dict["preview_images"] as? [String] {
+            testPreviewPictures.removeAll()
+            testPreviewPictures.append(objectsIn: previews)
+        }
     }
-    
-    // Метод для получения полного описания фильма
+
     func getFullDescription() -> String {
         return "\(testTitle)\nРейтинг: \(testRating)\nГод выпуска: \(testYeah)\nОписание: \(testDescription)"
+    }
+}
+
+// MARK: - Computed properties
+extension Item {
+    /// Извлекает путь к изображению из полного URL, если он соответствует формату TMDb
+    var posterPath: String? {
+        guard let pathComponent = testPic.components(separatedBy: "/t/p/").last else {
+            return nil
+        }
+        return "/" + pathComponent.components(separatedBy: "/").last!
     }
 }

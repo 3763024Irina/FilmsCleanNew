@@ -1,11 +1,11 @@
 import Foundation
 
 class TMDbAPI {
-   
+    
     private let apiKey = "ab3776f359fcef3b2030735ceea2eeaf"
     private let baseURL = "https://api.themoviedb.org/3/movie"
-    private let language = "ru-RU"
-
+    private let language = "fr-FR"
+    
     // Универсальный метод запроса
     func dataRequest(endpoint: String, page: Int = 1, completion: @escaping (Result<[String: Any], Error>) -> Void) {
         var components = URLComponents(string: "\(baseURL)/\(endpoint)")
@@ -41,7 +41,7 @@ class TMDbAPI {
         }.resume()
     }
 
-    // fetchLatest вызывает dataRequest с endpoint "latest"
+    // MARK: - Стандартные категории
     func fetchLatest(completion: @escaping (Result<[String: Any], Error>) -> Void) {
         dataRequest(endpoint: "latest", page: 1, completion: completion)
     }
@@ -56,5 +56,49 @@ class TMDbAPI {
 
     func fetchUpcoming(completion: @escaping (Result<[String: Any], Error>) -> Void) {
         dataRequest(endpoint: "upcoming", completion: completion)
+    }
+
+    // MARK: - Загрузка preview-изображений
+    func fetchImages(forMovieId id: Int, completion: @escaping (Result<[String], Error>) -> Void) {
+        var components = URLComponents(string: "\(baseURL)/\(id)/images")
+        components?.queryItems = [
+            URLQueryItem(name: "api_key", value: apiKey)
+        ]
+
+        guard let url = components?.url else {
+            completion(.failure(NSError(domain: "URL Error", code: 0)))
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+
+            guard let data = data else {
+                completion(.failure(NSError(domain: "Data Error", code: 0)))
+                return
+            }
+
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let backdrops = json["backdrops"] as? [[String: Any]] {
+
+                    let imageURLs: [String] = backdrops.prefix(5).compactMap { dict in
+                        if let path = dict["file_path"] as? String {
+                            return "https://image.tmdb.org/t/p/w780\(path)"
+                        }
+                        return nil
+                    }
+
+                    completion(.success(imageURLs))
+                } else {
+                    completion(.failure(NSError(domain: "Parsing Error", code: 0)))
+                }
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
     }
 }

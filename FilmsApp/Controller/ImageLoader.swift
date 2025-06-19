@@ -12,7 +12,7 @@ final class ImageLoader {
     private init() {}
 
     /// Формирует URL изображения TMDb
-    private func buildImageURL(from path: String?, size: String) -> URL? {
+    func buildImageURL(from path: String?, size: String) -> URL? {
         guard let path = path else { return nil }
         let trimmedPath = path.hasPrefix("/") ? path : "/\(path)"
         let urlString = "\(imageBaseURL)/\(size)\(trimmedPath)"

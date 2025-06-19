@@ -10,9 +10,9 @@ class FavoritesViewController: UIViewController {
 
     private let realm: Realm = {
         let config = Realm.Configuration(
-            schemaVersion: 3,
+            schemaVersion: 4,
             migrationBlock: { migration, oldSchemaVersion in
-                if oldSchemaVersion < 3 {
+                if oldSchemaVersion < 4 {
                     // миграции если нужны
                 }
             }
@@ -34,7 +34,6 @@ class FavoritesViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // Не нужно вызывать loadFavorites здесь — теперь обновления идут через Realm наблюдатель
     }
 
     deinit {
@@ -131,7 +130,7 @@ extension FavoritesViewController: MyCustomCellDelegate {
         } catch {
             print("❌ Ошибка при сохранении лайка: \(error)")
         }
-        // Здесь не нужно вызывать loadFavorites — обновление произойдёт автоматически
+   
     }
 
     func didTapCell(_ cell: MyCustomCell) {
