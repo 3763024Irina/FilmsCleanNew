@@ -1,9 +1,3 @@
-//
-//  ImageCache.swift
-//  FilmsApp
-//
-//  Created by Irina on 17/6/25.
-//
 
 import Foundation
 import UIKit

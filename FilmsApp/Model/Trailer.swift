@@ -33,3 +33,13 @@ class TrailerObject: Object {
         Trailer(id: id, key: key, name: name, site: site, type: type)
     }
 }
+
+class MovieObject: Object {
+    @objc dynamic var id = 0
+    @objc dynamic var title = ""
+    @objc dynamic var year = 0
+
+    override static func primaryKey() -> String? {
+        return "id"
+    }
+}

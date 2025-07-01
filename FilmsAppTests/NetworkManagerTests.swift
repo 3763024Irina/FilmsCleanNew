@@ -5,14 +5,14 @@
 //  Created by Irina on 15/6/25.
 //
 import XCTest
-@testable import FilmsApp  // Замени на имя твоего основного модуля
+@testable import FilmsApp
 
 final class NetworkManagerTests: XCTestCase {
     func testDataRequestSuccess() {
-        // Ожидаемость для асинхронного теста
+      
         let expectation = self.expectation(description: "Request completes")
 
-        // Пример валидного URL (например, открытый API)
+      
         let urlString = "https://jsonplaceholder.typicode.com/posts/1"
 
         NetworkManager.shared.dataRequest(urlString: urlString) { result in

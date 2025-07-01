@@ -33,7 +33,9 @@ class Model {
                         let item = Item()
                         item.id = movie.id
                         item.testTitle = movie.title
-                        item.testYeah = String(movie.releaseDate.prefix(4))
+                        let y = year(from: movie.releaseDate)
+                        item.testYeah = "\(y)"
+
                         item.testRating = String(movie.voteAverage)
                         item.testPic = movie.posterPath ?? ""
                         item.isLiked = false

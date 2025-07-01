@@ -20,6 +20,20 @@
                ReferencedContainer = "container:FilmsApp.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8C77B8BD2DFF400000C72EEC"
+               BuildableName = "FilmsAppTests.xctest"
+               BlueprintName = "FilmsAppTests"
+               ReferencedContainer = "container:FilmsApp.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -33,7 +47,7 @@
             parallelizable = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "8C77B8A12DFF3CC200C72EEC"
+               BlueprintIdentifier = "8C77B8BD2DFF400000C72EEC"
                BuildableName = "FilmsAppTests.xctest"
                BlueprintName = "FilmsAppTests"
                ReferencedContainer = "container:FilmsApp.xcodeproj">

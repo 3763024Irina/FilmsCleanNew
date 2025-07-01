@@ -5,4 +5,8 @@ target 'FilmsApp' do
 
   pod 'RealmSwift', '~> 10.39.1'
 
+  target 'FilmsAppTests' do
+    inherit! :search_paths
+    pod 'RealmSwift', '~> 10.39.1'
+  end
 end
