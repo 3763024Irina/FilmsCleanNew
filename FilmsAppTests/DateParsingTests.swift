@@ -4,7 +4,7 @@
 //
 //  Created by Irina on 1/7/25.
 //
-
+//Эти три теста проверяют функцию year(from:), которая извлекает год из строки даты, в разных сценариях
 import Foundation
 import XCTest
 @testable import FilmsApp

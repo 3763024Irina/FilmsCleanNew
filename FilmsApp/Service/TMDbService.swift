@@ -1,3 +1,31 @@
+/*утечка памяти:
+
+Типичные причины:
+
+Сессии URLSession не инвалидируются и держат вложенные замыкания с сильными ссылками на self.
+
+Нотификации / KVO: забыли отписаться от NotificationCenter/Realm notifications.
+
+Timers: таймеры (DispatchSourceTimer, CADisplayLink) продолжают жить после ухода контроллера.
+
+Realm: объекты-токены подписки (NotificationToken) не invalid().
+
+Способ решения
+
+В местах, где запускаются асинхронные работы (URLSession.dataTask, Realm observation, Timer), добавьте …{ [weak self] … } и инвалидировать/отписать в deinit или viewWillDisappear.
+
+swift
+
+После этих правок ещё раз профилирую Allocations + Leaks, чтобы убедиться, что «Persistent» аллокации не растут бесконечно.
+
+Как убедиться, что утечка исправлена
+
+Запустить с чистого старта Instruments, собрать пару циклов переходов между экранами.
+
+Убедиться, что после закрытия экрана объём «Persistent» памяти возвращается примерно к исходному уровню.
+
+*/
+
 import Foundation
 
 class TMDbAPI {

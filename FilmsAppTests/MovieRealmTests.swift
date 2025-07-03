@@ -15,7 +15,6 @@ import Foundation
 import XCTest
 import RealmSwift
 @testable import FilmsApp
-
 final class MovieRealmTests: XCTestCase {
     var realm: Realm!
 
